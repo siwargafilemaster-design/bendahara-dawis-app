@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+:root{
+  --ink:#12241B; --brand:#1F5138; --brand-dk:#163C29; --paid:#2F7D4F;
+  --gold:#C89A2B; --paper:#F1F4F1; --surface:#FFF; --line:#DDE4DE;
+  --muted:#7E8D86; --brick:#B3402F;
+}
+html,body{
+  background:var(--paper); color:var(--ink);
+  overscroll-behavior:none;                 /* matikan pull-to-refresh */
+  -webkit-tap-highlight-color:transparent;  /* hilangkan kotak biru */
+}
+button{ user-select:none; font-family:inherit }
+.num{ font-variant-numeric:tabular-nums }
+.safe-b{ padding-bottom:env(safe-area-inset-bottom) }
