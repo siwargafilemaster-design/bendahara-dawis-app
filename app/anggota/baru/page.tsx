@@ -32,8 +32,8 @@ export default function AnggotaBaru() {
 
   // periode_awal ikut tanggal — sampai istri mengubahnya manual
   useEffect(() => {
-    if (tglGabung && !manual) setPA(periodeAwalDari(tglGabung, ambang));
-  }, [tglGabung, ambang, manual]);
+    if (tglGabung && !manual) setPA(periodeAwalDari(tglGabung));
+  }, [tglGabung, manual]);
 
   async function simpan() {
     if (!nama.trim() || !wa.trim() || !tglGabung) {
