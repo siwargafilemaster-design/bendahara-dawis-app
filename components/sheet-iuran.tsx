@@ -13,8 +13,6 @@ type Props = {
   onSimpan: (kantong: Kantong, jumlahBulan: number) => void;
 };
 
-const PILIHAN = [1, 3, 6, 12];
-
 export default function SheetIuran({ nama, noRumah, periodeAwal, iuran, onTutup, onSimpan }: Props) {
   const [kantong, setKantong] = useState<Kantong>('tunai');
   const [bulan, setBulan] = useState(1);
@@ -51,18 +49,18 @@ export default function SheetIuran({ nama, noRumah, periodeAwal, iuran, onTutup,
 
         <label className="block text-[10px] font-extrabold tracking-widest uppercase mb-1.5"
           style={{ color: 'var(--muted)' }}>Bayar untuk</label>
-        <div className="flex gap-2 mb-3">
-          {PILIHAN.map(n => (
-            <button key={n} onClick={() => setBulan(n)}
-              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold border"
-              style={{
-                background: bulan === n ? 'var(--brand)' : 'var(--surface)',
-                color: bulan === n ? '#fff' : 'var(--ink)',
-                borderColor: bulan === n ? 'var(--brand)' : 'var(--line)',
-              }}>
-              {n} bln
-            </button>
-          ))}
+        <div className="flex items-center gap-3 mb-3">
+          <button onClick={() => setBulan(b => Math.max(1, b - 1))}
+            className="w-12 h-12 rounded-xl border text-2xl font-bold flex-none disabled:opacity-30"
+            style={{ borderColor: 'var(--line)' }} disabled={bulan <= 1}>−</button>
+          <div className="flex-1 text-center">
+            <div className="text-2xl font-extrabold num">{bulan}</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: 'var(--muted)' }}>bulan</div>
+          </div>
+          <button onClick={() => setBulan(b => b + 1)}
+            className="w-12 h-12 rounded-xl border text-2xl font-bold flex-none"
+            style={{ borderColor: 'var(--line)' }}>+</button>
         </div>
 
         {bulan > 1 && (
