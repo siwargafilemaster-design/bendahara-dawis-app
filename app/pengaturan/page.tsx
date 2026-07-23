@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 import { ambilPengaturan, simpanPengaturan } from '@/lib/pengaturan';
 
 type P = Record<string, string | null>;
 
-const KELOMPOK: { judul: string; items: { k: string; label: string; hint?: string; kunci?: boolean }[] }[] = [
+const KELOMPOK: { judul: string; items: { k: string; label: string; hint?: string; kunciTetap?: boolean; kunciSaldo?: boolean }[] }[] = [
   {
     judul: 'Identitas', items: [
       { k: 'nama_dawis', label: 'Nama Dawis' },
@@ -17,16 +18,15 @@ const KELOMPOK: { judul: string; items: { k: string; label: string; hint?: strin
   {
     judul: 'Aturan', items: [
       { k: 'iuran_flat', label: 'Iuran per bulan (Rp)' },
-      { k: 'ambang_prorata', label: 'Ambang prorata (tanggal)', hint: 'Masuk ≤ ini bayar bulan itu · keluar > ini bayar' },
       { k: 'jendela_resi_detik', label: 'Jendela resi (detik)', hint: 'Waktu membatalkan sebelum resi terbang' },
       { k: 'tgl_kumpulan', label: 'Jadwal kumpulan' },
     ],
   },
   {
     judul: 'Awal & Sistem', items: [
-      { k: 'saldo_awal', label: 'Saldo awal (Rp)', hint: 'Terkunci sejak transaksi pertama', kunci: true },
+      { k: 'saldo_awal', label: 'Saldo awal (Rp)', hint: 'Terkunci sejak transaksi pertama', kunciSaldo: true },
       { k: 'tgl_mulai', label: 'Mulai berlaku' },
-      { k: 'bulan_terkunci', label: 'Bulan terkunci', kunci: true },
+      { k: 'bulan_terkunci', label: 'Bulan terkunci', kunciTetap: true },
     ],
   },
 ];
@@ -36,8 +36,14 @@ export default function Pengaturan() {
   const [edit, setEdit] = useState<string | null>(null);
   const [draf, setDraf] = useState('');
   const [muat, setMuat] = useState(true);
+  const [adaTransaksi, setAdaTransaksi] = useState(false);
 
-  useEffect(() => { ambilPengaturan().then(v => { setP(v); setMuat(false); }); }, []);
+  useEffect(() => {
+    ambilPengaturan().then(v => { setP(v); setMuat(false); });
+    supabase.from('transaksi').select('id', { count: 'exact', head: true })
+      .eq('dibatalkan', false)
+      .then(({ count }) => setAdaTransaksi((count ?? 0) > 0));
+  }, []);
 
   async function simpan(k: string) {
     await simpanPengaturan(k, draf);
@@ -49,7 +55,6 @@ export default function Pengaturan() {
 
   return (
     <div className="p-4 pb-24">
-      {/* Data → Anggota */}
       <div className="text-[10px] font-extrabold tracking-widest uppercase mb-2"
         style={{ color: 'var(--muted)' }}>Data</div>
       <div className="rounded-2xl bg-white border mb-4" style={{ borderColor: 'var(--line)' }}>
@@ -64,7 +69,7 @@ export default function Pengaturan() {
           <span className="w-8 h-8 rounded-lg grid place-items-center text-sm"
             style={{ background: '#F5EEDA' }}>🏷</span>
           <span className="flex-1 font-bold text-[13px]">Kategori pengeluaran</span>
-          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Fase 2</span>
+          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Fase 7</span>
         </div>
       </div>
 
@@ -73,43 +78,45 @@ export default function Pengaturan() {
           <div className="text-[10px] font-extrabold tracking-widest uppercase mb-2"
             style={{ color: 'var(--muted)' }}>{g.judul}</div>
           <div className="rounded-2xl bg-white border mb-4" style={{ borderColor: 'var(--line)' }}>
-            {g.items.map((it, i) => (
-              <div key={it.k}
-                className="flex items-center justify-between gap-3 p-3.5"
-                style={{ borderBottom: i < g.items.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                <div className="min-w-0">
-                  <div className="text-[12px] font-bold">{it.label}</div>
-                  {it.hint && <div className="text-[10px] mt-0.5"
-                    style={{ color: 'var(--muted)' }}>{it.hint}</div>}
-                </div>
-                {edit === it.k ? (
-                  <div className="flex gap-1.5 flex-none">
-                    <input autoFocus value={draf} onChange={e => setDraf(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && simpan(it.k)}
-                      className="w-28 p-1.5 rounded-lg border text-[12px] text-right"
-                      style={{ borderColor: 'var(--brand)' }} />
-                    <button onClick={() => simpan(it.k)}
-                      className="px-2 rounded-lg text-white text-[11px] font-bold"
-                      style={{ background: 'var(--brand)' }}>OK</button>
+            {g.items.map((it, i) => {
+              const terkunci = it.kunciTetap || (it.kunciSaldo && adaTransaksi);
+              return (
+                <div key={it.k}
+                  className="flex items-center justify-between gap-3 p-3.5"
+                  style={{ borderBottom: i < g.items.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-bold">{it.label}</div>
+                    {it.hint && <div className="text-[10px] mt-0.5"
+                      style={{ color: 'var(--muted)' }}>{it.hint}</div>}
                   </div>
-                ) : (
-                  <button
-                    disabled={it.kunci}
-                    onClick={() => { setEdit(it.k); setDraf(p[it.k] ?? ''); }}
-                    className="text-[12px] font-bold text-right flex-none max-w-[52%] truncate disabled:opacity-60"
-                    style={{ color: it.kunci ? 'var(--muted)' : 'var(--brand)' }}>
-                    {p[it.k] || '—'}
-                  </button>
-                )}
-              </div>
-            ))}
+                  {edit === it.k ? (
+                    <div className="flex gap-1.5 flex-none">
+                      <input autoFocus value={draf} onChange={e => setDraf(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && simpan(it.k)}
+                        className="w-28 p-1.5 rounded-lg border text-[12px] text-right"
+                        style={{ borderColor: 'var(--brand)' }} />
+                      <button onClick={() => simpan(it.k)}
+                        className="px-2 rounded-lg text-white text-[11px] font-bold"
+                        style={{ background: 'var(--brand)' }}>OK</button>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={terkunci}
+                      onClick={() => { setEdit(it.k); setDraf(p[it.k] ?? ''); }}
+                      className="text-[12px] font-bold text-right flex-none max-w-[52%] truncate disabled:opacity-60"
+                      style={{ color: terkunci ? 'var(--muted)' : 'var(--brand)' }}>
+                      {p[it.k] || '—'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
 
       <button
-        onClick={async () => { const { supabase } = await import('@/lib/supabase');
-          await supabase.auth.signOut(); location.href = '/login'; }}
+        onClick={async () => { await supabase.auth.signOut(); location.href = '/login'; }}
         className="w-full p-3 rounded-xl border text-[13px] font-bold"
         style={{ borderColor: 'var(--line)', color: 'var(--brick)' }}>
         Keluar

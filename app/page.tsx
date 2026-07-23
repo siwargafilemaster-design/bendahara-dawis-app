@@ -1,65 +1,92 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { ambilPengaturan } from '@/lib/pengaturan';
+import { hitungSaldo, Saldo } from '@/lib/saldo';
+import { rupiah } from '@/lib/uang';
+import SheetPindah from '@/components/sheet-pindah';
+
+type Trx = {
+  id: string; jenis: string; nominal: number; kantong: string;
+  periode: string | null; catatan: string | null; tanggal: string;
+  warga: { no_rumah: string; nama_kk: string } | null;
+};
 
 export default function Beranda() {
-  const [nama, setNama] = useState('');
-  const [jml, setJml] = useState<number | null>(null);
+  const [saldo, setSaldo] = useState<Saldo | null>(null);
+  const [trx, setTrx] = useState<Trx[]>([]);
+  const [pindah, setPindah] = useState(false);
 
-  useEffect(() => {
-    ambilPengaturan().then(p => setNama(p['nama_bendahara'] ?? '')).catch(() => {});
-    supabase.from('warga').select('id', { count: 'exact', head: true })
-      .is('tgl_keluar', null)
-      .then(({ count }) => setJml(count ?? 0));
-  }, []);
+  async function muat() {
+    const p = await ambilPengaturan();
+    setSaldo(await hitungSaldo(p));
+    const { data } = await supabase.from('transaksi')
+      .select('id,jenis,nominal,kantong,periode,catatan,tanggal, warga:warga_id(no_rumah,nama_kk)')
+      .eq('dibatalkan', false)
+      .order('created_at', { ascending: false }).limit(5);
+    setTrx((data ?? []) as any);
+  }
+  useEffect(() => { muat(); }, []);
+
+  const warna = (j: string) => j === 'masuk' ? 'var(--paid)' : j === 'keluar' ? 'var(--brick)' : 'var(--muted)';
+  const tanda = (j: string) => j === 'masuk' ? '+' : j === 'keluar' ? '−' : '';
+  const bgIc = (j: string) => j === 'masuk' ? '#E3F1E8' : j === 'keluar' ? '#FAE7E3' : '#F5EEDA';
+  const ikon = (j: string) => j === 'masuk' ? '↓' : j === 'keluar' ? '↑' : '⇄';
 
   return (
     <div className="p-4 pb-24">
-      {/* Kartu sambutan — bukan kartu saldo. Saldo hadir di Fase 2. */}
-      <div className="rounded-2xl p-5 text-white"
+      <div className="rounded-2xl p-4 text-white"
         style={{ background: 'linear-gradient(165deg,var(--brand),var(--brand-dk))' }}>
         <div className="text-[10px] font-extrabold tracking-widest uppercase"
-          style={{ color: '#9BC3AC' }}>Selamat datang</div>
-        <div className="text-2xl font-extrabold mt-1 leading-tight">
-          {nama || 'Bendahara'}
+          style={{ color: '#9BC3AC' }}>Saldo Kas</div>
+        <div className="text-3xl font-extrabold mt-0.5 num">
+          {saldo ? rupiah(saldo.total) : '—'}
         </div>
-        <div className="text-[12px] mt-3" style={{ color: '#B9D3C4' }}>
-          {jml === null ? 'Memuat…'
-            : jml === 0 ? 'Belum ada anggota terdaftar.'
-            : `${jml} anggota sudah terdaftar.`}
+        <div className="flex gap-2 mt-3">
+          <div className="flex-1 rounded-xl p-2.5" style={{ background: 'rgba(255,255,255,.09)' }}>
+            <div className="text-[9.5px] font-bold uppercase" style={{ color: '#9BC3AC' }}>Tunai</div>
+            <div className="text-[14px] font-bold num">{saldo ? rupiah(saldo.tunai) : '—'}</div>
+          </div>
+          <div className="flex-1 rounded-xl p-2.5" style={{ background: 'rgba(255,255,255,.09)' }}>
+            <div className="text-[9.5px] font-bold uppercase" style={{ color: '#9BC3AC' }}>DANA</div>
+            <div className="text-[14px] font-bold num">{saldo ? rupiah(saldo.dana) : '—'}</div>
+          </div>
         </div>
+        <button onClick={() => setPindah(true)}
+          className="w-full mt-2.5 py-2.5 rounded-xl text-[12.5px] font-bold"
+          style={{ background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.22)' }}>
+          ⇄ Pindah antar kantong
+        </button>
       </div>
 
-      {/* Pengarah tunggal ke pekerjaan Fase 1 */}
-      <Link href="/anggota"
-        className="mt-4 flex items-center gap-3 rounded-2xl bg-white border p-4"
-        style={{ borderColor: 'var(--line)' }}>
-        <span className="w-11 h-11 rounded-xl grid place-items-center text-lg flex-none"
-          style={{ background: '#E3F1E8' }}>👥</span>
-        <span className="flex-1 min-w-0">
-          <b className="block text-[14px] font-extrabold">
-            {jml ? 'Kelola anggota' : 'Mulai: tambah anggota'}
-          </b>
-          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-            {jml ? 'Lihat, tambah, atau ubah data KK' : 'Masukkan daftar KK Dawis'}
-          </span>
-        </span>
-        <span style={{ color: 'var(--line)' }}>›</span>
-      </Link>
-
-      {/* Isyarat jujur bahwa fitur kas belum aktif */}
-      <div className="mt-3 rounded-2xl border border-dashed p-4"
-        style={{ borderColor: 'var(--line)' }}>
-        <div className="text-[11px] font-bold" style={{ color: 'var(--muted)' }}>
-          Pencatatan iuran & kas
-        </div>
-        <div className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>
-          Menyusul setelah data anggota siap. Untuk sekarang, lengkapi dulu
-          daftar anggota dan data di Pengaturan.
-        </div>
+      <div className="text-[10px] font-extrabold tracking-widest uppercase mt-4 mb-2"
+        style={{ color: 'var(--muted)' }}>Transaksi terakhir</div>
+      <div className="rounded-2xl bg-white border" style={{ borderColor: 'var(--line)' }}>
+        {trx.map(t => (
+          <div key={t.id} className="flex items-center gap-3 p-3 border-b last:border-b-0"
+            style={{ borderColor: 'var(--line)' }}>
+            <span className="w-8 h-8 rounded-lg grid place-items-center flex-none text-[13px] font-bold"
+              style={{ background: bgIc(t.jenis), color: warna(t.jenis) }}>{ikon(t.jenis)}</span>
+            <div className="flex-1 min-w-0">
+              <b className="block text-[12.5px] truncate">
+                {t.warga ? `${t.warga.no_rumah} · ${t.warga.nama_kk}`
+                  : (t.catatan ?? (t.jenis === 'pindah' ? 'Pindah kantong' : 'Pengeluaran'))}
+              </b>
+              <span className="text-[10.5px]" style={{ color: 'var(--muted)' }}>
+                {t.periode ? `Iuran ${t.periode} · ` : ''}{t.kantong === 'dana' ? 'DANA' : 'Tunai'}
+              </span>
+            </div>
+            <span className="text-[12.5px] font-bold num" style={{ color: warna(t.jenis) }}>
+              {tanda(t.jenis)}{t.nominal.toLocaleString('id-ID')}
+            </span>
+          </div>
+        ))}
+        {trx.length === 0 && (
+          <p className="p-6 text-center text-[12px]" style={{ color: 'var(--muted)' }}>Belum ada transaksi.</p>
+        )}
       </div>
+
+      {pindah && <SheetPindah onTutup={() => setPindah(false)} onSelesai={() => { setPindah(false); muat(); }} />}
     </div>
   );
 }
