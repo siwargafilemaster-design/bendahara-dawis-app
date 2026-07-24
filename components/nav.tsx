@@ -44,12 +44,7 @@ export default function Nav() {
           className="w-9 h-9 rounded-lg flex-none text-lg"
           style={{ background: 'rgba(255,255,255,.14)' }}>‹</button>
       ) : (
-        <div className="w-[42px] h-[42px] rounded-xl flex-none grid place-items-center font-extrabold text-[15px]"
-          style={{
-            background: 'linear-gradient(150deg,#F3E3B4,var(--gold))',
-            color: 'var(--brand-dk)',
-            border: '1px solid rgba(255,255,255,.35)',
-          }}>GG</div>
+        <img src="/logo-gamersi.png" alt="Logo Gamersi" className="w-14 h-14 flex-none" />
       )}
 
       <div className="flex-1 min-w-0">

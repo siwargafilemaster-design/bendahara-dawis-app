@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Periode } from './periode';
+import { antreInsert, antreBatal, prosesOutbox } from './outbox';
 
 export type Jenis = 'masuk' | 'keluar' | 'pindah';
 export type Kantong = 'tunai' | 'dana';
@@ -25,10 +26,9 @@ export type Transaksi = {
 const uuid = () => crypto.randomUUID();
 const hariIni = () => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** Iuran satu bulan. id dari client (idempotency, §3). */
 export function baueIuran(warga_id: string, periode: Periode, nominal: number,
   kantong: Kantong, batch_id: string | null = null): Transaksi {
   return {
@@ -39,22 +39,19 @@ export function baueIuran(warga_id: string, periode: Periode, nominal: number,
   };
 }
 
-/** INSERT satu/banyak baris. Dipakai optimistic — dipanggil SETELAH UI update. */
+/** Tulis via OUTBOX (tahan mati), lalu picu pengiriman. */
 export async function simpanTransaksi(rows: Transaksi[]) {
-  const { error } = await supabase.from('transaksi').insert(
-    rows.map(({ created_at, ...r }) => r)
-  );
-  if (error) throw error;
+  for (const r of rows) await antreInsert(r);
+  prosesOutbox();               // tidak di-await: jangan tahan UI
 }
 
-/** Batalkan (jangan DELETE, §10). */
+/** Batalkan via OUTBOX. */
 export async function batalkan(id: string) {
-  const { error } = await supabase.from('transaksi')
-    .update({ dibatalkan: true }).eq('id', id);
-  if (error) throw error;
+  await antreBatal(id);
+  prosesOutbox();
 }
 
-/** Status bayar iuran untuk satu periode → Set<warga_id> yang sudah bayar. */
+/** BACA — tetap dari Supabase (dilengkapi overlay di page). */
 export async function statusBayar(periode: Periode): Promise<Set<string>> {
   const { data, error } = await supabase.from('transaksi')
     .select('warga_id')
@@ -63,7 +60,6 @@ export async function statusBayar(periode: Periode): Promise<Set<string>> {
   return new Set((data ?? []).map(r => r.warga_id as string));
 }
 
-/** Semua iuran (untuk hitungTunggakan). */
 export async function semuaIuran(): Promise<{ warga_id: string; periode: Periode }[]> {
   const { data, error } = await supabase.from('transaksi')
     .select('warga_id, periode')

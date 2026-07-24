@@ -4,7 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { ambilPengaturan } from '@/lib/pengaturan';
 import { hitungSaldo, Saldo } from '@/lib/saldo';
 import { rupiah } from '@/lib/uang';
+import { prosesOutbox } from '@/lib/outbox';
 import SheetPindah from '@/components/sheet-pindah';
+import SyncBadge from '@/components/sync-badge';
 
 type Trx = {
   id: string; jenis: string; nominal: number; kantong: string;
@@ -18,15 +20,18 @@ export default function Beranda() {
   const [pindah, setPindah] = useState(false);
 
   async function muat() {
-    const p = await ambilPengaturan();
-    setSaldo(await hitungSaldo(p));
-    const { data } = await supabase.from('transaksi')
-      .select('id,jenis,nominal,kantong,periode,catatan,tanggal, warga:warga_id(no_rumah,nama_kk)')
-      .eq('dibatalkan', false)
-      .order('created_at', { ascending: false }).limit(5);
-    setTrx((data ?? []) as any);
+    try {
+      const p = await ambilPengaturan();
+      setSaldo(await hitungSaldo(p));
+      const { data } = await supabase.from('transaksi')
+        .select('id,jenis,nominal,kantong,periode,catatan,tanggal, warga:warga_id(no_rumah,nama_kk)')
+        .eq('dibatalkan', false)
+        .order('created_at', { ascending: false }).limit(5);
+      setTrx((data ?? []) as any);
+    } catch { /* offline: biarkan tampilan terakhir */ }
   }
-  useEffect(() => { muat(); }, []);
+
+  useEffect(() => { prosesOutbox().then(muat); }, []);
 
   const warna = (j: string) => j === 'masuk' ? 'var(--paid)' : j === 'keluar' ? 'var(--brick)' : 'var(--muted)';
   const tanda = (j: string) => j === 'masuk' ? '+' : j === 'keluar' ? '−' : '';
@@ -58,6 +63,8 @@ export default function Beranda() {
           ⇄ Pindah antar kantong
         </button>
       </div>
+
+      <SyncBadge />
 
       <div className="text-[10px] font-extrabold tracking-widest uppercase mt-4 mb-2"
         style={{ color: 'var(--muted)' }}>Transaksi terakhir</div>
