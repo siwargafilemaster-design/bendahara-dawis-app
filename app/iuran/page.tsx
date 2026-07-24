@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { prosesOutbox } from '@/lib/outbox';
 import { denganTimeout } from '@/lib/net';
 import SheetIuran from '@/components/sheet-iuran';
+import { urutRumah } from '@/lib/urut';
 
 type Warga = {
   id: string; no_rumah: string; nama_kk: string;
@@ -53,9 +54,10 @@ export default function Iuran() {
           .order('no_rumah')
       );
       if (res.data) {
-        setWarga(res.data);
-        await db.snapshot.put({ kunci: 'warga', data: res.data, disimpan: Date.now() });
-      }
+  const urut = [...res.data].sort(urutRumah);
+  setWarga(urut);
+  await db.snapshot.put({ kunci: 'warga', data: urut, disimpan: Date.now() });
+}
     } catch { /* biarkan snapshot */ }
   }, []);
 

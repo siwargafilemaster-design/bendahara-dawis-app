@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { namaBulan } from '@/lib/periode';
+import { urutRumah } from '@/lib/urut';
 
 type Warga = {
   id: string; no_rumah: string; nama_kk: string; no_wa: string;
@@ -16,10 +17,10 @@ export default function AnggotaList() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    supabase.from('warga').select('*').order('no_rumah')
+    supabase.from('warga').select('*')
       .then(({ data, error }) => {
         if (error) setErr(error.message);
-        else setData(data ?? []);   // ← guard: jangan pernah filter null
+        else setData([...(data ?? [])].sort(urutRumah));   // ← guard: jangan pernah filter null
         setMuat(false);
       });
   }, []);
