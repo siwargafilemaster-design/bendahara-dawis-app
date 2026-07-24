@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ambilPengaturan } from '@/lib/pengaturan';
+import { supabase } from '@/lib/supabase';
 
 const JUDUL: Record<string, string> = {
   '/iuran': 'Iuran',
@@ -21,7 +22,19 @@ export default function Nav() {
   const router = useRouter();
   const [p, setP] = useState<Record<string, string | null>>({});
 
-  useEffect(() => { ambilPengaturan().then(setP).catch(() => {}); }, []);
+  useEffect(() => {
+    let hidup = true;
+    const muat = () => ambilPengaturan().then(v => hidup && setP(v)).catch(() => {});
+
+    muat(); // percobaan pertama
+
+    // muat ulang begitu sesi auth benar-benar siap
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) muat();
+    });
+
+    return () => { hidup = false; sub.subscription.unsubscribe(); };
+  }, []);
 
   if (path === '/login') return null;
 
