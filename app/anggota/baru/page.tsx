@@ -114,7 +114,7 @@ export default function AnggotaBaru() {
           onClick={() => setManual(true)}
         />
         <p className="text-[10.5px] mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>
-          Otomatis dari tanggal gabung (ambang tgl {ambang}). Ketuk untuk ubah manual.
+          Otomatis dari tanggal gabung. Ketuk untuk ubah manual.
         </p>
       </div>
 

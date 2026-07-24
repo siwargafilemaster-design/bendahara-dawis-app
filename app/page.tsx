@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ambilPengaturan } from '@/lib/pengaturan';
-import { hitungSaldo, Saldo } from '@/lib/saldo';
+import { hitungSaldo, saldoCache, Saldo } from '@/lib/saldo';
 import { rupiah } from '@/lib/uang';
 import { prosesOutbox } from '@/lib/outbox';
 import SheetPindah from '@/components/sheet-pindah';
@@ -31,7 +31,19 @@ export default function Beranda() {
     } catch { /* offline: biarkan tampilan terakhir */ }
   }
 
-  useEffect(() => { prosesOutbox().then(muat); }, []);
+  useEffect(() => {
+    // (3) tampilkan saldo lama DULU — hapus jeda "— lalu terisi"
+    saldoCache().then(s => { if (s) setSaldo(prev => prev ?? s); });
+    prosesOutbox().then(muat);
+  }, []);
+
+  // (1) muat ulang saat sesi siap
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) muat();
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   const warna = (j: string) => j === 'masuk' ? 'var(--paid)' : j === 'keluar' ? 'var(--brick)' : 'var(--muted)';
   const tanda = (j: string) => j === 'masuk' ? '+' : j === 'keluar' ? '−' : '';

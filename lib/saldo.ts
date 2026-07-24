@@ -1,8 +1,15 @@
 import { supabase } from './supabase';
 import { angka, Pengaturan } from './pengaturan';
+import { db } from './db';
 
 export type Saldo = { total: number; tunai: number; dana: number;
   masuk: number; keluar: number };
+
+/** Saldo terakhir yang tersimpan — untuk tampil instan sebelum server jawab. */
+export async function saldoCache(): Promise<Saldo | null> {
+  const snap = await db.snapshot.get('saldo');
+  return snap ? (snap.data as Saldo) : null;
+}
 
 export async function hitungSaldo(p: Pengaturan): Promise<Saldo> {
   const { data, error } = await supabase.from('transaksi')
@@ -21,13 +28,15 @@ export async function hitungSaldo(p: Pengaturan): Promise<Saldo> {
     } else if (t.jenis === 'keluar') {
       keluar += n;
       t.kantong === 'tunai' ? (tunai -= n) : (dana -= n);
-    } else { // pindah — TIDAK masuk masuk/keluar (§5)
+    } else {
       if (t.kantong === 'tunai') { tunai -= n; dana += n; }
       else { dana -= n; tunai += n; }
     }
   }
 
-  // saldo_awal diperlakukan sebagai saldo tunai awal
   tunai += saldoAwal;
-  return { total: saldoAwal + masuk - keluar, tunai, dana, masuk, keluar };
+  const saldo: Saldo = { total: saldoAwal + masuk - keluar, tunai, dana, masuk, keluar };
+
+  await db.snapshot.put({ kunci: 'saldo', data: saldo, disimpan: Date.now() });
+  return saldo;
 }
