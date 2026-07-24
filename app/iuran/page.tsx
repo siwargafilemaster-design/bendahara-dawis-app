@@ -25,52 +25,8 @@ export default function Iuran() {
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLong = useRef(false);
 
-  // ── muat warga: offline → snapshot; online → server lalu simpan snapshot
-  const muatWarga = useCallback(async () => {
-    if (!navigator.onLine) {
-      const snap = await db.snapshot.get('warga');
-      if (snap) setWarga(snap.data);
-      return;
-    }
-    try {
-      const res: any = await denganTimeout(
-        supabase.from('warga')
-          .select('id,no_rumah,nama_kk,periode_awal,periode_akhir')
-          .order('no_rumah')
-      );
-      if (res.data) {
-        setWarga(res.data);
-        await db.snapshot.put({ kunci: 'warga', data: res.data, disimpan: Date.now() });
-      }
-    } catch {
-      const snap = await db.snapshot.get('warga');
-      if (snap) setWarga(snap.data);
-    }
-  }, []);
-
-  // ── muat status bayar: offline → snapshot; online → server; lalu overlay outbox
-  const muatBayar = useCallback(async () => {
-    let m = new Map<string, string>();
-
-    if (!navigator.onLine) {
-      const snap = await db.snapshot.get(`bayar:${periode}`);
-      if (snap) m = new Map(snap.data);
-    } else {
-      try {
-        const res: any = await denganTimeout(
-          supabase.from('transaksi')
-            .select('id, warga_id')
-            .eq('jenis', 'masuk').eq('periode', periode).eq('dibatalkan', false)
-        );
-        (res.data ?? []).forEach((r: any) => m.set(r.warga_id, r.id));
-        await db.snapshot.put({ kunci: `bayar:${periode}`, data: [...m], disimpan: Date.now() });
-      } catch {
-        const snap = await db.snapshot.get(`bayar:${periode}`);
-        if (snap) m = new Map(snap.data);
-      }
-    }
-
-    // overlay outbox — baris yang belum sampai server
+  // overlay outbox ke sebuah map (dipakai ulang)
+  const overlayOutbox = useCallback(async (m: Map<string, string>) => {
     const antri = await db.outbox.toArray();
     for (const it of antri) {
       if (it.tipe === 'insert') {
@@ -81,11 +37,53 @@ export default function Iuran() {
         for (const [wid, tid] of m) if (tid === target) m.delete(wid);
       }
     }
-
-    setBayar(m);
+    return m;
   }, [periode]);
 
-  // muat awal + iuran
+  // ── WARGA: snapshot dulu → lalu server (kalau online)
+  const muatWarga = useCallback(async () => {
+    const snap = await db.snapshot.get('warga');
+    if (snap) setWarga(snap.data);                 // tampil INSTAN
+
+    if (!navigator.onLine) return;
+    try {
+      const res: any = await denganTimeout(
+        supabase.from('warga')
+          .select('id,no_rumah,nama_kk,periode_awal,periode_akhir')
+          .order('no_rumah')
+      );
+      if (res.data) {
+        setWarga(res.data);
+        await db.snapshot.put({ kunci: 'warga', data: res.data, disimpan: Date.now() });
+      }
+    } catch { /* biarkan snapshot */ }
+  }, []);
+
+  // ── BAYAR: snapshot+overlay dulu → lalu server (kalau online)
+  const muatBayar = useCallback(async () => {
+    // 1) tampil instan dari snapshot + overlay outbox
+    const snap = await db.snapshot.get(`bayar:${periode}`);
+    let m = new Map<string, string>(snap ? snap.data : []);
+    m = await overlayOutbox(m);
+    setBayar(new Map(m));
+
+    if (!navigator.onLine) return;
+
+    // 2) perbarui dari server di belakang
+    try {
+      const res: any = await denganTimeout(
+        supabase.from('transaksi')
+          .select('id, warga_id')
+          .eq('jenis', 'masuk').eq('periode', periode).eq('dibatalkan', false)
+      );
+      const fresh = new Map<string, string>();
+      (res.data ?? []).forEach((r: any) => fresh.set(r.warga_id, r.id));
+      await db.snapshot.put({ kunci: `bayar:${periode}`, data: [...fresh], disimpan: Date.now() });
+      const withOverlay = await overlayOutbox(new Map(fresh));
+      setBayar(withOverlay);
+    } catch { /* biarkan tampilan snapshot */ }
+  }, [periode, overlayOutbox]);
+
   useEffect(() => {
     ambilPengaturan().then(p => setIuran(angka(p, 'iuran_flat', 10000))).catch(() => {});
     muatWarga();
@@ -93,7 +91,6 @@ export default function Iuran() {
 
   useEffect(() => { muatBayar(); }, [muatBayar]);
 
-  // (1) fetch ulang saat sesi auth siap — bukan cuma saat pertama render
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session) { muatWarga(); muatBayar(); }
@@ -101,7 +98,6 @@ export default function Iuran() {
     return () => sub.subscription.unsubscribe();
   }, [muatWarga, muatBayar]);
 
-  // proses antrian saat online kembali
   useEffect(() => {
     const on = () => prosesOutbox().then(muatBayar);
     window.addEventListener('online', on);

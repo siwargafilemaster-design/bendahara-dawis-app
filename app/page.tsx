@@ -16,10 +16,12 @@ type Trx = {
 
 export default function Beranda() {
   const [saldo, setSaldo] = useState<Saldo | null>(null);
-  const [trx, setTrx] = useState<Trx[]>([]);
+  const [trx, setTrx] = useState<Trx[] | null>(null);   // null = belum termuat
+  const [offline, setOffline] = useState(false);
   const [pindah, setPindah] = useState(false);
 
   async function muat() {
+    if (!navigator.onLine) { setOffline(true); return; }
     try {
       const p = await ambilPengaturan();
       setSaldo(await hitungSaldo(p));
@@ -28,16 +30,18 @@ export default function Beranda() {
         .eq('dibatalkan', false)
         .order('created_at', { ascending: false }).limit(5);
       setTrx((data ?? []) as any);
-    } catch { /* offline: biarkan tampilan terakhir */ }
+      setOffline(false);
+    } catch { setOffline(true); }
   }
 
   useEffect(() => {
-    // (3) tampilkan saldo lama DULU — hapus jeda "— lalu terisi"
     saldoCache().then(s => { if (s) setSaldo(prev => prev ?? s); });
     prosesOutbox().then(muat);
+    const on = () => muat();
+    window.addEventListener('online', on);
+    return () => window.removeEventListener('online', on);
   }, []);
 
-  // (1) muat ulang saat sesi siap
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session) muat();
@@ -81,7 +85,7 @@ export default function Beranda() {
       <div className="text-[10px] font-extrabold tracking-widest uppercase mt-4 mb-2"
         style={{ color: 'var(--muted)' }}>Transaksi terakhir</div>
       <div className="rounded-2xl bg-white border" style={{ borderColor: 'var(--line)' }}>
-        {trx.map(t => (
+        {trx && trx.length > 0 && trx.map(t => (
           <div key={t.id} className="flex items-center gap-3 p-3 border-b last:border-b-0"
             style={{ borderColor: 'var(--line)' }}>
             <span className="w-8 h-8 rounded-lg grid place-items-center flex-none text-[13px] font-bold"
@@ -100,8 +104,20 @@ export default function Beranda() {
             </span>
           </div>
         ))}
-        {trx.length === 0 && (
-          <p className="p-6 text-center text-[12px]" style={{ color: 'var(--muted)' }}>Belum ada transaksi.</p>
+
+        {/* tiga keadaan */}
+        {offline && (!trx || trx.length === 0) && (
+          <p className="p-6 text-center text-[12px]" style={{ color: 'var(--muted)' }}>
+            Kamu sedang offline.<br />Sambungkan internet untuk melihat transaksi terakhir.
+          </p>
+        )}
+        {!offline && trx && trx.length === 0 && (
+          <p className="p-6 text-center text-[12px]" style={{ color: 'var(--muted)' }}>
+            Belum ada transaksi.
+          </p>
+        )}
+        {!offline && trx === null && (
+          <p className="p-6 text-center text-[12px]" style={{ color: 'var(--muted)' }}>Memuat…</p>
         )}
       </div>
 
