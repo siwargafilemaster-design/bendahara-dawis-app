@@ -9,6 +9,7 @@ import { prosesOutbox } from '@/lib/outbox';
 import { denganTimeout } from '@/lib/net';
 import SheetIuran from '@/components/sheet-iuran';
 import { urutRumah } from '@/lib/urut';
+import { jadwalkanKirim } from '@/lib/resi';
 
 type Warga = {
   id: string; no_rumah: string; nama_kk: string;
@@ -120,17 +121,25 @@ export default function Iuran() {
       await batalkan(sudah);
     } else {
       const row = baueIuran(w.id, periode, iuran, 'tunai');
+      row.resi_status = 'tertahan';                    // ← resi menunggu
       const next = new Map(bayar); next.set(w.id, row.id); setBayar(next);
       pesan(`${w.no_rumah} · ${w.nama_kk} — tersimpan`);
       await simpanTransaksi([row]);
+      jadwalkanKirim();                                // ← reset timer 60 dtk
     }
   }
 
   async function simpanBatch(w: Warga, kantong: Kantong, jumlahBulan: number) {
     setSheet(null);
     const batch = jumlahBulan > 1 ? crypto.randomUUID() : null;
-    const rows = Array.from({ length: jumlahBulan }, (_, i) =>
-      baueIuran(w.id, geser(periode, i), iuran, kantong, batch));
+    const rows = Array.from({ length: jumlahBulan }, (_, i) => {
+      const r = baueIuran(w.id, geser(periode, i), iuran, kantong, batch);
+      r.resi_status = 'tertahan';                      // ← semua tertahan
+      return r;
+    });
+    // ... (setBayar, pesan, simpanTransaksi sama)
+    await simpanTransaksi(rows);
+    jadwalkanKirim();
     const next = new Map(bayar);
     rows.forEach(r => { if (r.periode === periode) next.set(w.id, r.id); });
     setBayar(next);
