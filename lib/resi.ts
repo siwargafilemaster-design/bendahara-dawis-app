@@ -8,6 +8,7 @@ const THROTTLE_MS = 4_000;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pendengar: (() => void) | null = null;
+let sedangKirim = false;
 
 /** Daftar warga_id yang resinya masih tertahan (untuk indikator). */
 export async function petiTertahan(): Promise<string[]> {
@@ -38,9 +39,12 @@ export async function batalkanPeti() {
  *    (jaring pengaman saat app dibuka — JANGAN kirim yang baru dijadwalkan).
  *  hanyaJatuhTempo=false → semua (timer habis / tombol "Kirim sekarang"). */
 export async function kirimSemuaTertahan(hanyaJatuhTempo = false) {
+  if (sedangKirim) return;
   if (!hanyaJatuhTempo && timer) { clearTimeout(timer); timer = null; }
   if (!navigator.onLine) return;
 
+  sedangKirim = true;
+  try {
   const peng = await ambilPengaturan();
   const namaDawis = peng['nama_dawis'] ?? 'Dasa Wisma';
 
@@ -104,6 +108,9 @@ export async function kirimSemuaTertahan(hanyaJatuhTempo = false) {
   }
 
   pendengar?.();
+} finally {
+  sedangKirim = false;
+ }
 }
 
 /** Kirim ulang yang gagal (dari indikator). */
