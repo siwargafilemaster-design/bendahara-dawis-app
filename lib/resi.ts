@@ -6,12 +6,6 @@ import { Periode } from './periode';
 const JENDELA_MS = 60_000;
 const THROTTLE_MS = 4_000;
 
-type ItemPeti = {
-  transaksiIds: string[];   // 1 atau N (bayar di muka)
-  wargaId: string;
-  batchId: string | null;
-};
-
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pendengar: (() => void) | null = null;
 
@@ -33,27 +27,34 @@ export function jadwalkanKirim(onTick?: () => void) {
 /** Batalkan SEMUA resi tertahan (dipicu tombol Batal). Timer mati. */
 export async function batalkanPeti() {
   if (timer) { clearTimeout(timer); timer = null; }
-  // resi dibatalkan → status skip (transaksinya sendiri TIDAK dibatalkan;
-  // yang batal cuma pengiriman resinya)
   await supabase.from('transaksi')
     .update({ resi_status: 'skip' })
     .eq('jenis', 'masuk').eq('resi_status', 'tertahan').eq('dibatalkan', false);
   pendengar?.();
 }
 
-/** Kirim semua yang tertahan. Dipanggil saat timer habis / saat app dibuka. */
-export async function kirimSemuaTertahan() {
-  if (timer) { clearTimeout(timer); timer = null; }
-  if (!navigator.onLine) return; // nanti saja saat online
+/** Kirim yang tertahan.
+ *  hanyaJatuhTempo=true → cuma yang created_at sudah > 60 dtk lalu
+ *    (jaring pengaman saat app dibuka — JANGAN kirim yang baru dijadwalkan).
+ *  hanyaJatuhTempo=false → semua (timer habis / tombol "Kirim sekarang"). */
+export async function kirimSemuaTertahan(hanyaJatuhTempo = false) {
+  if (!hanyaJatuhTempo && timer) { clearTimeout(timer); timer = null; }
+  if (!navigator.onLine) return;
 
   const peng = await ambilPengaturan();
   const namaDawis = peng['nama_dawis'] ?? 'Dasa Wisma';
 
-  // ambil semua transaksi tertahan + data warga, kelompokkan per warga+batch
-  const { data } = await supabase.from('transaksi')
-    .select('id, warga_id, periode, nominal, kantong, tanggal, batch_id, warga:warga_id(no_rumah,nama_kk,no_wa)')
+  let q = supabase.from('transaksi')
+    .select('id, warga_id, periode, nominal, kantong, tanggal, batch_id, created_at, warga:warga_id(no_rumah,nama_kk,no_wa)')
     .eq('jenis', 'masuk').eq('resi_status', 'tertahan').eq('dibatalkan', false);
 
+  // jaring pengaman: hanya yang sudah lewat jendela 60 detik
+  if (hanyaJatuhTempo) {
+    const ambang = new Date(Date.now() - JENDELA_MS).toISOString();
+    q = q.lt('created_at', ambang);
+  }
+
+  const { data } = await q;
   if (!data || data.length === 0) return;
 
   // kelompokkan: batch_id (kalau ada) atau id tunggal
@@ -64,11 +65,9 @@ export async function kirimSemuaTertahan() {
     grup.get(kunci)!.push(t);
   }
 
-  // kirim per grup, throttle antar pesan
   for (const [kunci, rows] of grup) {
     const w = rows[0].warga;
     if (!w?.no_wa) {
-      // tak ada WA → tandai skip, jangan gagal
       await supabase.from('transaksi').update({ resi_status: 'skip' })
         .in('id', rows.map(r => r.id));
       continue;
@@ -96,13 +95,12 @@ export async function kirimSemuaTertahan() {
         await supabase.from('transaksi').update({ resi_status: 'gagal' })
           .in('id', rows.map(r => r.id));
       }
-      // sukses: route handler sudah set 'terkirim'
     } catch {
       await supabase.from('transaksi').update({ resi_status: 'gagal' })
         .in('id', rows.map(r => r.id));
     }
 
-    await new Promise(r => setTimeout(r, THROTTLE_MS)); // throttle
+    await new Promise(r => setTimeout(r, THROTTLE_MS));
   }
 
   pendengar?.();

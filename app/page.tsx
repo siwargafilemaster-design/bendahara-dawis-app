@@ -40,10 +40,10 @@ export default function Beranda() {
 useEffect(() => {
   saldoCache().then(s => { if (s) setSaldo(prev => prev ?? s); });
   prosesOutbox().then(muat);
-  kirimSemuaTertahan();                    // ← jaring pengaman: timer mungkin mati
+  kirimSemuaTertahan(true);                    // ← jaring pengaman: timer mungkin mati
   fetch('/api/fonnte-status').then(r => r.json())
     .then(d => setFonnteAktif(d.aktif)).catch(() => setFonnteAktif(false));
-  const on = () => { muat(); kirimSemuaTertahan(); };
+  const on = () => { muat(); kirimSemuaTertahan(true); };
   window.addEventListener('online', on);
   return () => window.removeEventListener('online', on);
 }, []);
