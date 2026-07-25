@@ -1,7 +1,7 @@
 // ── VERSI CACHE ──
 // Ganti angka ini tiap deploy yang mengubah app shell.
 // Nama cache berubah → 'activate' menghapus yang lama → pengguna dapat versi baru.
-const CACHE = 'dawis-v1';
+const CACHE = 'dawis-v2';
 
 // ── APP SHELL ──
 // Yang di-cache saat install. Cukup kerangka; Next.js punya banyak file
@@ -10,7 +10,6 @@ const SHELL = [
   '/',
   '/iuran',
   '/kas',
-  '/rekap',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -23,7 +22,9 @@ const SHELL = [
 // tak menunggu semua tab lama ditutup.
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) =>
+      Promise.allSettled(SHELL.map((url) => c.add(url)))
+    ).then(() => self.skipWaiting())
   );
 });
 
