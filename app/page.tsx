@@ -9,6 +9,7 @@ import SheetPindah from '@/components/sheet-pindah';
 import SyncBadge from '@/components/sync-badge';
 import PetiResi from '@/components/peti-resi';
 import { kirimSemuaTertahan } from '@/lib/resi';
+import FonnteBadge from '@/components/fonnte-badge';
 
 type Trx = {
   id: string; jenis: string; nominal: number; kantong: string;
@@ -21,8 +22,7 @@ export default function Beranda() {
   const [trx, setTrx] = useState<Trx[] | null>(null);   // null = belum termuat
   const [offline, setOffline] = useState(false);
   const [pindah, setPindah] = useState(false);
-  const [fonnteAktif, setFonnteAktif] = useState<boolean | null>(null);
-
+  
   async function muat() {
     if (!navigator.onLine) { setOffline(true); return; }
     try {
@@ -40,9 +40,7 @@ export default function Beranda() {
 useEffect(() => {
   saldoCache().then(s => { if (s) setSaldo(prev => prev ?? s); });
   prosesOutbox().then(muat);
-  kirimSemuaTertahan(true);                    // ← jaring pengaman: timer mungkin mati
-  fetch('/api/fonnte-status').then(r => r.json())
-    .then(d => setFonnteAktif(d.aktif)).catch(() => setFonnteAktif(false));
+  kirimSemuaTertahan(true);                    
   const on = () => { muat(); kirimSemuaTertahan(true); };
   window.addEventListener('online', on);
   return () => window.removeEventListener('online', on);
@@ -88,14 +86,7 @@ useEffect(() => {
 
       <SyncBadge />
       <PetiResi />
-
-      {fonnteAktif === false && (
-        <div className="mt-3 rounded-xl px-3 py-2 text-[11px] font-bold"
-          style={{ background: '#FAE7E3', border: '1px solid #F0C4BC', color: 'var(--brick)' }}>
-          ⚠ WhatsApp Fonnte terputus — resi tidak akan terkirim.
-          Cek Perangkat Tertaut di HP.
-        </div>
-      )}
+      <FonnteBadge />
 
       <div className="text-[10px] font-extrabold tracking-widest uppercase mt-4 mb-2"
         style={{ color: 'var(--muted)' }}>Transaksi terakhir</div>

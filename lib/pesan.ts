@@ -3,42 +3,53 @@ import { rupiah } from './uang';
 
 type DataResi = {
   namaDawis: string;
+  alamat: string;
   noRumah: string;
   namaKK: string;
-  periode: Periode[];      // bisa banyak (bayar di muka)
+  periode: Periode[];
   total: number;
   kantong: 'tunai' | 'dana';
-  tanggal: string;
+  tanggal: string;        // 'YYYY-MM-DD'
+  namaBendahara: string;
   noResi: string;
 };
 
-/** Daftar periode → "Agu–Des 2026" atau "Agu 2026" */
-function ringkasPeriode(ps: Periode[]): string {
+function tglTampil(iso: string): string {
+  const [th, bl, tg] = iso.split('-');
+  return `${tg}/${bl}/${th}`;
+}
+
+function ketPeriode(ps: Periode[]): string {
   if (ps.length === 0) return '';
   const urut = [...ps].sort();
-  if (urut.length === 1) return namaBulan(urut[0]);
-  return `${namaBulan(urut[0])} – ${namaBulan(urut[urut.length - 1])}`;
+  if (urut.length === 1) return namaBulan(urut[0], true);
+  return `${namaBulan(urut[0], true)} – ${namaBulan(urut[urut.length - 1], true)} (${urut.length} bulan)`;
+}
+
+export function nomorResi(idOrBatch: string, tanggal: string): string {
+  const tgl = tanggal.replace(/-/g, '').slice(2);
+  const suffix = idOrBatch.replace(/-/g, '').slice(0, 4).toUpperCase();
+  return `${tgl}-${suffix}`;
 }
 
 export function pesanResi(d: DataResi): string {
-  return `*RESI PENERIMAAN*
+  return `*BUKTI PEMBAYARAN IURAN DAWIS*
 ${d.namaDawis}
+_${d.alamat}_
 
-No    : ${d.noResi}
-Rumah : ${d.noRumah}
-Nama  : ${d.namaKK}
-Untuk : Iuran ${ringkasPeriode(d.periode)}
-Jumlah: ${rupiah(d.total)}
-Cara  : ${d.kantong === 'dana' ? 'DANA' : 'Tunai'}
-Tgl   : ${d.tanggal}
+Halo Bu *${d.namaKK}* (${d.noRumah}) 🌸
 
-Terima kasih 🙏
-_Pesan otomatis, tidak perlu dibalas_`;
-}
+Iuran kas sudah kami terima ya,
 
-/** No resi ringkas dari batch/id + tanggal. Cukup unik untuk manusia. */
-export function nomorResi(idOrBatch: string, tanggal: string): string {
-  const tgl = tanggal.replace(/-/g, '').slice(2); // 260724
-  const suffix = idOrBatch.replace(/-/g, '').slice(0, 4).toUpperCase();
-  return `${tgl}-${suffix}`;
+📌 No Resi : ${d.noResi}
+📅 Tanggal : ${tglTampil(d.tanggal)}
+💵 Jumlah  : *${rupiah(d.total)}*
+💳 Cara    : ${d.kantong === 'dana' ? 'DANA' : 'Tunai'}
+📝 Untuk   : Iuran ${ketPeriode(d.periode)}
+
+Matur nuwun 🙏
+Salam hangat,
+*${d.namaBendahara || 'Bendahara Dawis'}*
+____________________________
+_Pesan otomatis. Tidak perlu dibalas._`;
 }

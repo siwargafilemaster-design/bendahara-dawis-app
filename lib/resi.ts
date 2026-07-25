@@ -47,6 +47,8 @@ export async function kirimSemuaTertahan(hanyaJatuhTempo = false) {
   try {
   const peng = await ambilPengaturan();
   const namaDawis = peng['nama_dawis'] ?? 'Dasa Wisma';
+  const alamat = peng['alamat'] ?? '';
+  const namaBendahara = peng['nama_bendahara'] ?? 'Bendahara Dawis';
 
   let q = supabase.from('transaksi')
     .select('id, warga_id, periode, nominal, kantong, tanggal, batch_id, created_at, warga:warga_id(no_rumah,nama_kk,no_wa)')
@@ -79,10 +81,10 @@ export async function kirimSemuaTertahan(hanyaJatuhTempo = false) {
 
     const total = rows.reduce((s, r) => s + r.nominal, 0);
     const teks = pesanResi({
-      namaDawis, noRumah: w.no_rumah, namaKK: w.nama_kk,
+      namaDawis, alamat, noRumah: w.no_rumah, namaKK: w.nama_kk,
       periode: rows.map(r => r.periode as Periode),
       total, kantong: rows[0].kantong, tanggal: rows[0].tanggal,
-      noResi: nomorResi(kunci, rows[0].tanggal),
+      namaBendahara, noResi: nomorResi(kunci, rows[0].tanggal),
     });
 
     try {

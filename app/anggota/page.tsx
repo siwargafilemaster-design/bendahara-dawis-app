@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { namaBulan } from '@/lib/periode';
@@ -16,17 +16,28 @@ export default function AnggotaList() {
   const [muat, setMuat] = useState(true);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
-    supabase.from('warga').select('*')
-      .then(({ data, error }) => {
-        if (error) setErr(error.message);
-        else setData([...(data ?? [])].sort(urutRumah));   // ← guard: jangan pernah filter null
-        setMuat(false);
-      });
+  const ambil = useCallback(async () => {
+    const { data, error } = await supabase.from('warga').select('*');
+    if (error) setErr(error.message);
+    else setData([...(data ?? [])].sort(urutRumah));   // ← selalu terurut
+    setMuat(false);
   }, []);
 
-  const aktif  = data.filter(w => !w.tgl_keluar);
-  const keluar = data.filter(w =>  w.tgl_keluar);
+  useEffect(() => { ambil(); }, [ambil]);
+
+  // muat ulang saat halaman kembali terlihat (balik dari detail)
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) ambil(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', ambil);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', ambil);
+    };
+  }, [ambil]);
+
+  const aktif = data.filter(w => !w.tgl_keluar);
+  const keluar = data.filter(w => w.tgl_keluar);
 
   const Baris = ({ w, redup }: { w: Warga; redup?: boolean }) => (
     <Link href={`/anggota/${w.id}`}
