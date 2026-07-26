@@ -1,11 +1,7 @@
 // ── VERSI CACHE ──
-// Ganti angka ini tiap deploy yang mengubah app shell.
-// Nama cache berubah → 'activate' menghapus yang lama → pengguna dapat versi baru.
-const CACHE = 'dawis-v2';
+const CACHE = 'dawis-v3';   // naikkan ke v3 → activate bersihkan v2
 
 // ── APP SHELL ──
-// Yang di-cache saat install. Cukup kerangka; Next.js punya banyak file
-// hash yang tak bisa didaftar manual — itu di-cache saat 'fetch' (lihat bawah).
 const SHELL = [
   '/',
   '/iuran',
@@ -18,10 +14,7 @@ const SHELL = [
   '/logo-gamersi.png',
 ];
 
-// ── MOMEN 1: INSTALL ──
-// Dipanggil sekali saat SW pertama didaftarkan / versinya berubah.
-// Isi cache dengan shell. skipWaiting() → versi baru langsung aktif,
-// tak menunggu semua tab lama ditutup.
+// ── INSTALL ──
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE).then((c) =>
@@ -30,9 +23,7 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// ── MOMEN 2: ACTIVATE ──
-// Dipanggil saat SW baru mengambil alih. Hapus cache versi lama
-// (nama ≠ CACHE sekarang), biar storage tak menumpuk tiap update.
+// ── ACTIVATE ──
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((nama) =>
@@ -41,36 +32,56 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// ── MOMEN 3: FETCH ──
-// Dipanggil tiap app minta sesuatu. Di sinilah keputusan cache-vs-jaringan.
+// ── FETCH ──
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // 1) JANGAN sentuh data & API. Selalu ke jaringan asli.
-  //    Supabase, Fonnte route, dan semua non-GET (POST/PATCH) lewat begitu saja.
+  // 1) JANGAN sentuh data & API — selalu ke jaringan asli.
   if (
     e.request.method !== 'GET' ||
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('supabase') ||
     url.hostname.includes('fonnte')
   ) {
-    return; // biarkan browser tangani normal — TIDAK di-cache
+    return;
   }
 
-  // 2) Untuk app shell & aset: coba jaringan dulu, jatuh ke cache kalau gagal.
-  //    "Network-first" → selalu dapat versi terbaru kalau online,
-  //    tetap jalan kalau offline. Pas untuk app yang sering di-deploy.
+  // 2) ASET STATIS BER-HASH (/_next/, gambar, ikon) → CACHE-FIRST.
+  //    Nama ber-hash = immutable; aman dari cache selamanya, tak akan basi.
+  //    Ini yang MENYELESAIKAN cold-start blank: JS Next selalu ada di cache,
+  //    diambil duluan dari cache, tak bergantung jaringan.
+  const asetStatis =
+    url.pathname.startsWith('/_next/') ||
+    /\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico)$/i.test(url.pathname);
+
+  if (asetStatis) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        if (cached) return cached;               // ada di cache → pakai
+        return fetch(e.request).then((res) => {  // belum → ambil & simpan
+          const salinan = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, salinan));
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // 3) HALAMAN / NAVIGASI → NETWORK-FIRST.
+  //    Selalu coba versi terbaru (app sering di-deploy); offline → cache;
+  //    kalau navigasi & tak ada di cache → fallback ke '/' (app shell).
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        // simpan salinan segar ke cache (untuk offline berikutnya)
         const salinan = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, salinan));
         return res;
       })
       .catch(() =>
-        // offline → sajikan dari cache; kalau navigasi & tak ada, fallback ke '/'
-        caches.match(e.request).then((cached) => cached || caches.match('/'))
+        caches.match(e.request).then((cached) =>
+          cached || caches.match('/')
+        )
       )
   );
 });

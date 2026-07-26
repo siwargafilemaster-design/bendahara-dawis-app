@@ -10,6 +10,7 @@ import { denganTimeout } from '@/lib/net';
 import SheetIuran from '@/components/sheet-iuran';
 import { urutRumah } from '@/lib/urut';
 import { jadwalkanKirim } from '@/lib/resi';
+import PetiResi from '@/components/peti-resi';
 
 type Warga = {
   id: string; no_rumah: string; nama_kk: string;
@@ -160,6 +161,8 @@ export default function Iuran() {
 
   return (
     <div className="p-4 pb-24">
+      < PetiResi />
+
       <div className="flex items-center justify-between bg-white border rounded-xl p-2 mb-3"
         style={{ borderColor: 'var(--line)' }}>
         <button onClick={() => setPeriode(geser(periode, -1))}
