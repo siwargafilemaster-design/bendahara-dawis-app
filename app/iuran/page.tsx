@@ -161,8 +161,6 @@ export default function Iuran() {
 
   return (
     <div className="p-4 pb-24">
-      < PetiResi />
-
       <div className="flex items-center justify-between bg-white border rounded-xl p-2 mb-3"
         style={{ borderColor: 'var(--line)' }}>
         <button onClick={() => setPeriode(geser(periode, -1))}
@@ -223,6 +221,11 @@ export default function Iuran() {
           onSimpan={(k, n) => simpanBatch(sheet, k, n)}
         />
       )}
+
+      <div className="fixed left-0 right-0 z-30 px-4 max-w-[430px] mx-auto"
+        style={{ bottom: 'calc(var(--tabbar-h, 64px) + 8px)' }}>
+        <PetiResi />
+      </div>
     </div>
   );
 }

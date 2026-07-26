@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bendahara Dawis — Griya Gamersi Lalung
 
-## Getting Started
+A treasury (cash-book) app for a neighbourhood **Dasa Wisma** — the smallest unit of Indonesia's PKK community organisation.
 
-First, run the development server:
+## Why this exists
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This app was built for one person: my wife.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+She was recently appointed treasurer (*bendahara*) of our neighbourhood Dasa Wisma in Griya Gamersi Lalung, Karanganyar. It's a brand-new group — no cash box yet, no records, starting from zero — with around 25 households, mostly the mothers of the block.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+She didn't want a generic finance app. She wanted something that fit *exactly* how a Dasa Wisma treasurer actually works: collecting dues at the monthly gathering, sometimes with no signal and no data left on her phone; sending a receipt so each member knows their payment landed; and, at month's end, reporting a clean summary to the head of the group.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+So I built it around her, following one rule the whole way: **the app follows the group's rules, not the other way around.** Every decision — how dues work, what counts as paid, when a receipt flies — came from how her Dawis actually runs, not from what was easy to code.
 
-## Learn More
+## What it does
 
-To learn more about Next.js, take a look at the following resources:
+**At the gathering (in her hand, in a crowd):**
+- Install to the home screen like a real app (PWA)
+- Record a payment in **one tap** — faster than a pen, which was the whole point
+- Works **fully offline** — the app shell and the member data are both cached, so a dead signal doesn't stop her
+- A WhatsApp **receipt** flies automatically ~60 seconds after each payment, with a quiet window to cancel a mistap before anyone sees it
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**At home (reporting, alone):**
+- Monthly **cash-basis summary** — money in, money out, balance — so the cash in her hand always matches the report
+- **PDF export** with a proper header, ready to share to the group's WhatsApp
+- Close the books per month (reversible, in case of corrections)
+- Manage members (join / leave), with a warm thank-you or a gentle reminder when someone moves out
+- **Payment cards** per household — who's paid, through which month, and *when* they paid — the one place that untangles a member who paid several months in advance
+- Manage expense categories (add / deactivate, never delete)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How it's built
 
-## Deploy on Vercel
+- **Next.js 16** (App Router) on **Vercel**
+- **Supabase** (Postgres + Row-Level Security) for data
+- **Fonnte** for automated WhatsApp receipts; personal WhatsApp links (`wa.me`) for the personal, occasional messages
+- **jsPDF** for client-side report generation
+- A hand-written **service worker** for offline support — written by hand, not a library, so the offline behaviour is understood rather than borrowed
+- Single-user by design: only the treasurer signs in; members simply receive receipts and reports over WhatsApp
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Design principles that shaped it
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **One tap = one payment.** If it loses to a pen, it's dead.
+- **Data first, receipt second.** A receipt never flies until the payment is safely recorded — no member ever holds proof for a payment the books didn't capture.
+- **Never delete — deactivate.** Cancelled payments, departed members, closed months: all keep their trail. A treasurer who can explain her numbers is stronger than one whose records merely look clean.
+- **Cash-basis reporting**, so the money in the box always equals the number on the screen.
+- **Build what's used, when it's asked for** — not by the order of a checklist.
+
+## Status
+
+Complete and in use. Seven build phases, all tested and live. Built over a handful of evenings — coded entirely from a phone via GitHub Codespaces — as a break from a larger project, and as a way to help my wife do a job she volunteered for.
+
+---
+
+*Built with care for the treasurer of Dasa Wisma Griya Gamersi Lalung, Karanganyar, Central Java.*
+
