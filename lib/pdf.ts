@@ -35,20 +35,20 @@ export async function unduhPDF(rekap: Rekap) {
   doc.text(`Saldo Akhir      : ${rupiah(rekap.saldoAkhir)}`, 15, y); y += 4;
 
   // ── TABEL IURAN MASUK ──
+  const yJudulMasuk = y + 6;
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+  doc.text('Rincian Iuran Masuk', 15, yJudulMasuk);
+
   autoTable(doc, {
-    startY: y + 4,
-    head: [['No. Rumah', 'Nama KK', 'Iuran']],
+    startY: yJudulMasuk + 2,
+    head: [['No. Rumah', 'Nama KK', 'Tgl Bayar', 'Iuran']],
     body: rekap.masuk.length
-      ? rekap.masuk.map(m => [m.noRumah, m.namaKK, rupiah(m.nominal)])
-      : [['—', 'Belum ada iuran', '—']],
+      ? rekap.masuk.map(m => [m.noRumah, m.namaKK, m.tanggal, rupiah(m.nominal)])
+      : [['—', 'Belum ada iuran', '—', '—']],
     theme: 'grid',
     headStyles: { fillColor: [31, 81, 56], fontSize: 9 },
     bodyStyles: { fontSize: 8 },
     margin: { left: 15, right: 15 },
-    didDrawPage: (d: any) => {
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-      doc.text('Rincian Iuran Masuk', 15, d.cursor.y - (rekap.masuk.length ? 0 : 0));
-    },
   });
 
   // ── TABEL PENGELUARAN ──

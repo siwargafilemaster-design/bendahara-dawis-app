@@ -9,6 +9,8 @@ const CACHE = 'dawis-v2';
 const SHELL = [
   '/',
   '/iuran',
+  '/rekap',
+  '/rekap/anggota',
   '/kas',
   '/manifest.json',
   '/icon-192.png',
