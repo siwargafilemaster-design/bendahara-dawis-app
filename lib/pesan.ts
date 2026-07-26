@@ -53,3 +53,49 @@ Salam hangat,
 ____________________________
 _Pesan otomatis. Tidak perlu dibalas._`;
 }
+
+type DataPindah = {
+  namaDawis: string;
+  namaKK: string;
+  noRumah: string;
+  namaBendahara: string;
+  tunggakanBulan: string[];   // daftar namaBulan yang belum dibayar
+  totalTunggakan: number;
+};
+
+export function pesanPindah(d: DataPindah): string {
+  const lunas = d.tunggakanBulan.length === 0;
+
+  if (lunas) {
+    return `*PAMIT & TERIMA KASIH*
+${d.namaDawis}
+
+Halo Bu *${d.namaKK}* (${d.noRumah}) 🌸
+
+Matur nuwun sudah menjadi bagian dari Dawis kita 🙏
+Iuran kas Ibu semua sudah *lunas*, tidak ada tanggungan.
+
+Semoga sehat & sukses selalu di tempat baru 🏡
+Pintu kami selalu terbuka kalau Ibu kembali.
+
+Salam hangat,
+*${d.namaBendahara || 'Bendahara Dawis'}*`;
+  }
+
+  return `*INFO IURAN — SEBELUM PINDAH*
+${d.namaDawis}
+
+Halo Bu *${d.namaKK}* (${d.noRumah}) 🌸
+
+Terima kasih sudah menjadi bagian dari Dawis kita 🙏
+Sebelum pindah, ada sedikit tanggungan iuran yang belum terselesaikan:
+
+📋 Bulan: ${d.tunggakanBulan.join(', ')}
+💵 Total: *${rupiah(d.totalTunggakan)}*
+
+Mohon bisa diselesaikan ya Bu, matur nuwun 🙏
+Semoga sehat & sukses di tempat baru 🏡
+
+Salam hangat,
+*${d.namaBendahara || 'Bendahara Dawis'}*`;
+}

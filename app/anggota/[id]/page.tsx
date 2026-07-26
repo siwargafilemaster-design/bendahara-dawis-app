@@ -54,6 +54,35 @@ export default function DetailAnggota() {
     }).eq('id', id);
     setSimpan(false);
     if (error) return setPesan('Gagal: ' + error.message);
+
+    // ── hitung tunggakan → susun pesan → tawarkan kirim WA ──
+    const { semuaIuran } = await import('@/lib/transaksi');
+    const { hitungTunggakan } = await import('@/lib/tunggakan');
+    const { pesanPindah } = await import('@/lib/pesan');
+    const { ambilPengaturan, angka } = await import('@/lib/pengaturan');
+    const { namaBulan } = await import('@/lib/periode');
+
+    const peng = await ambilPengaturan();
+    const bayar = await semuaIuran();
+    const t = hitungTunggakan(
+      { id: w!.id, no_rumah: w!.no_rumah, nama_kk: w!.nama_kk, no_wa: w!.no_wa,
+        periode_awal: w!.periode_awal, periode_akhir: pAkhir },
+      bayar, angka(peng, 'iuran_flat', 10000)
+    );
+
+    const teks = pesanPindah({
+      namaDawis: peng['nama_dawis'] ?? 'Dasa Wisma',
+      namaKK: w!.nama_kk, noRumah: w!.no_rumah,
+      namaBendahara: peng['nama_bendahara'] ?? '',
+      tunggakanBulan: t.bulan.map(b => namaBulan(b)),
+      totalTunggakan: t.total,
+    });
+
+    const waLink = `https://wa.me/${w!.no_wa}?text=${encodeURIComponent(teks)}`;
+    if (confirm('Kirim pesan pamit/tagihan ke WhatsApp anggota ini?')) {
+      window.open(waLink, '_blank');
+    }
+
     muat();
   }
 
