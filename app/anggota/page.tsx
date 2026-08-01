@@ -15,24 +15,33 @@ export default function AnggotaList() {
   const [data, setData] = useState<Warga[]>([]);
   const [muat, setMuat] = useState(true);
   const [err, setErr] = useState('');
+  const [offline, setOffline] = useState(false);
 
   const ambil = useCallback(async () => {
+    if (!navigator.onLine) {          // ← offline: jangan fetch, tampilkan pesan sopan
+      setOffline(true);
+      setMuat(false);
+      return;
+    }
+    setOffline(false);
     const { data, error } = await supabase.from('warga').select('*');
     if (error) setErr(error.message);
-    else setData([...(data ?? [])].sort(urutRumah));   // ← selalu terurut
+    else { setData([...(data ?? [])].sort(urutRumah)); setErr(''); }   // ← selalu terurut
     setMuat(false);
   }, []);
 
   useEffect(() => { ambil(); }, [ambil]);
 
-  // muat ulang saat halaman kembali terlihat (balik dari detail)
+  // muat ulang saat halaman kembali terlihat (balik dari detail) & saat online kembali
   useEffect(() => {
     const onVisible = () => { if (!document.hidden) ambil(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', ambil);
+    window.addEventListener('online', ambil);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', ambil);
+      window.removeEventListener('online', ambil);
     };
   }, [ambil]);
 
@@ -58,6 +67,18 @@ export default function AnggotaList() {
   );
 
   if (muat) return <div className="p-4" style={{ color: 'var(--muted)' }}>Memuat…</div>;
+
+  if (offline) return (
+    <div className="p-4 pb-24">
+      <div className="rounded-2xl bg-white border p-8 text-center" style={{ borderColor: 'var(--line)' }}>
+        <p className="text-[13px] font-bold mb-1">Kamu sedang offline</p>
+        <p className="text-[11px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+          Daftar anggota perlu internet. Sambungkan koneksi untuk mengelola anggota.
+        </p>
+      </div>
+    </div>
+  );
+
   if (err) return <div className="p-4 text-[13px]" style={{ color: 'var(--brick)' }}>Gagal memuat: {err}</div>;
 
   return (

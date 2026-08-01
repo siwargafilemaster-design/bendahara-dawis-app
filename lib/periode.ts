@@ -41,27 +41,17 @@ export function periodeAwalDari(tglGabung: string): Periode {
 }
 
 /**
- * Tanggal pertemuan = Minggu ke-2 di bulan itu.
- * Kembalikan ANGKA tanggal (bukan Date) supaya perbandingan angka-lawan-angka.
- * new Date(th, bl-1, 1) pakai zona lokal → aman.
+ * SISI KELUAR — aturan Dawis: deadline iuran = TANGGAL pertemuan (dari
+ * pengaturan 'tgl_kumpulan', mis. "Tanggal 15" → 15). Dioper sebagai
+ * parameter supaya fungsi tetap sinkron — nol Date, nol timezone.
+ *
+ * Keluar SEBELUM tanggal pertemuan (mis. tgl 1..14) → tak bayar bulan itu.
+ * Keluar PADA/SESUDAH (mis. tgl 15 ke atas) → bayar bulan itu.
  */
-export function tanggalPertemuan(p: Periode): number {
-  const [th, bl] = p.split('-').map(Number);
-  const hariPertama = new Date(th, bl - 1, 1).getDay(); // 0=Minggu
-  const offsetKeMingguPertama = (7 - hariPertama) % 7;
-  return 1 + offsetKeMingguPertama + 7; // tanggal Minggu ke-2
-}
-
-/**
- * SISI KELUAR — aturan Dawis: deadline iuran = hari pertemuan.
- * Keluar SEBELUM pertemuan → tidak bayar bulan berjalan.
- * Keluar PADA/SESUDAH pertemuan → bayar bulan berjalan (deadline lewat).
- * Bandingkan angka tgl vs angka pertemuan — nol Date, nol timezone.
- */
-export function periodeAkhirDari(tglKeluar: string): Periode {
+export function periodeAkhirDari(tglKeluar: string, tglPertemuan = 15): Periode {
   const { th, bl, tgl } = pecahTanggal(tglKeluar);
   const p = buatPeriode(th, bl);
-  return tgl < tanggalPertemuan(p) ? geser(p, -1) : p;
+  return tgl < tglPertemuan ? geser(p, -1) : p;
 }
 
 export function rentang(awal: Periode, akhir: Periode): Periode[] {

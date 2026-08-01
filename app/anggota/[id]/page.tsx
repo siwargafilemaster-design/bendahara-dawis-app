@@ -48,7 +48,14 @@ export default function DetailAnggota() {
   async function tandaiKeluar() {
     if (!tglKeluar) return setPesan('Isi tanggal keluar dulu');
     setSimpan(true); setPesan('');
-    const pAkhir = periodeAkhirDari(tglKeluar);
+
+    const { ambilPengaturan, angka } = await import('@/lib/pengaturan');
+    const peng = await ambilPengaturan();
+
+    // tanggal pertemuan dari 'tgl_kumpulan' (mis. "Tanggal 15" → 15); default 15
+    const tglPertemuan = parseInt((peng['tgl_kumpulan'] ?? '').replace(/\D/g, ''), 10) || 15;
+    const pAkhir = periodeAkhirDari(tglKeluar, tglPertemuan);
+
     const { error } = await supabase.from('warga').update({
       tgl_keluar: tglKeluar, periode_akhir: pAkhir,
     }).eq('id', id);
@@ -59,10 +66,7 @@ export default function DetailAnggota() {
     const { semuaIuran } = await import('@/lib/transaksi');
     const { hitungTunggakan } = await import('@/lib/tunggakan');
     const { pesanPindah } = await import('@/lib/pesan');
-    const { ambilPengaturan, angka } = await import('@/lib/pengaturan');
-    const { namaBulan } = await import('@/lib/periode');
 
-    const peng = await ambilPengaturan();
     const bayar = await semuaIuran();
     const t = hitungTunggakan(
       { id: w!.id, no_rumah: w!.no_rumah, nama_kk: w!.nama_kk, no_wa: w!.no_wa,
@@ -159,7 +163,7 @@ export default function DetailAnggota() {
         <div className="rounded-2xl bg-white border p-4" style={{ borderColor: 'var(--line)' }}>
           <div className="text-[12px] font-extrabold mb-1">Tutup buku anggota</div>
           <p className="text-[10.5px] mb-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
-            Tandai kalau anggota pindah/keluar. Aturan: keluar sebelum kumpulan (Minggu ke-2) →
+            Tandai kalau anggota pindah/keluar. Aturan: keluar sebelum tanggal kumpulan →
             tak ditagih bulan itu; pada/sesudahnya → tetap ditagih.
           </p>
           {w.tgl_keluar ? (
