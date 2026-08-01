@@ -23,9 +23,15 @@ export type KartuWarga = {
 /** Susun 12 sel untuk satu tahun. Status tiap bulan:
  *  - luar   : di luar masa keanggotaan (< awal atau > akhir)
  *  - lunas  : ada transaksi masuk periode itu
- *  - nunggak: dalam masa, sudah lewat/berjalan, belum bayar
- *  - belum  : dalam masa, tapi bulan depan (belum jatuh tempo) */
-export async function susunKartu(warga: KartuWarga, tahun: number): Promise<SelBulan[]> {
+ *  - nunggak: bulan lalu belum bayar, ATAU bulan ini & sudah lewat tgl pertemuan
+ *  - belum  : bulan depan, ATAU bulan ini tapi belum sampai tgl pertemuan
+ *  tglPertemuan dari pengaturan 'tgl_kumpulan' — bulan berjalan baru jadi
+ *  nunggak setelah tanggal itu lewat (bukan sejak tanggal 1). */
+export async function susunKartu(
+  warga: KartuWarga,
+  tahun: number,
+  tglPertemuan = 15,
+): Promise<SelBulan[]> {
   // ambil semua iuran warga ini (lunas by periode)
   const { data } = await supabase.from('transaksi')
     .select('id, periode, tanggal, kantong, nominal, batch_id')
@@ -35,6 +41,7 @@ export async function susunKartu(warga: KartuWarga, tahun: number): Promise<SelB
   (data ?? []).forEach(r => byPeriode.set(r.periode as string, r));
 
   const skrg = periodeSekarang();
+  const tglHariIni = new Date().getDate();   // tanggal hari ini (1-31)
 
   const sel: SelBulan[] = [];
   for (let bl = 1; bl <= 12; bl++) {
@@ -49,9 +56,11 @@ export async function susunKartu(warga: KartuWarga, tahun: number): Promise<SelB
     } else if (byPeriode.has(periode)) {
       status = 'lunas';
     } else if (periode > skrg) {
-      status = 'belum';           // bulan depan, belum jatuh tempo
+      status = 'belum';                                   // bulan depan
+    } else if (periode === skrg && tglHariIni < tglPertemuan) {
+      status = 'belum';                                   // bulan ini, belum sampai tgl pertemuan
     } else {
-      status = 'nunggak';         // sudah lewat/berjalan, belum bayar
+      status = 'nunggak';                                 // bulan lalu, ATAU bulan ini & sudah lewat tgl pertemuan
     }
 
     const t = byPeriode.get(periode);

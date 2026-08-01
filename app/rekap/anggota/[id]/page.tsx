@@ -16,6 +16,7 @@ export default function KartuIuran() {
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [sel, setSel] = useState<SelBulan[]>([]);
   const [iuran, setIuran] = useState(10000);
+  const [tglPertemuan, setTglPertemuan] = useState(15);
   const [namaDawis, setNamaDawis] = useState('Dasa Wisma');
   const [namaBendahara, setNamaBendahara] = useState('');
   const [detail, setDetail] = useState<SelBulan | null>(null);
@@ -30,14 +31,15 @@ export default function KartuIuran() {
       });
       const p = await ambilPengaturan();
       setIuran(angka(p, 'iuran_flat', 10000));
+      setTglPertemuan(parseInt((p['tgl_kumpulan'] ?? '').replace(/\D/g, ''), 10) || 15);
       setNamaDawis(p['nama_dawis'] ?? 'Dasa Wisma');
       setNamaBendahara(p['nama_bendahara'] ?? '');
     })();
   }, [id]);
 
   useEffect(() => {
-    if (warga) susunKartu(warga, tahun).then(setSel);
-  }, [warga, tahun]);
+    if (warga) susunKartu(warga, tahun, tglPertemuan).then(setSel);
+  }, [warga, tahun, tglPertemuan]);
 
   const nunggak = bulanNunggak(sel);
   const totalNunggak = nunggak.length * iuran;
