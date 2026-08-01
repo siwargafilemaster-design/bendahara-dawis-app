@@ -1,13 +1,17 @@
-// ── VERSI CACHE ──
-const CACHE = 'dawis-v3';   // naikkan ke v3 → activate bersihkan v2
+// ══════════════════════════════════════════════
+//  SERVICE WORKER — Bendahara Dawis (manual, v4)
+//  Network-first halaman + cache-first aset (dengan .catch anti-freeze)
+// ══════════════════════════════════════════════
 
-// ── APP SHELL ──
+const CACHE = 'dawis-v4';
+
 const SHELL = [
   '/',
   '/iuran',
+  '/kas',
   '/rekap',
   '/rekap/anggota',
-  '/kas',
+  '/kategori',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -17,18 +21,20 @@ const SHELL = [
 // ── INSTALL ──
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) =>
-      Promise.allSettled(SHELL.map((url) => c.add(url)))
-    ).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((c) => Promise.allSettled(SHELL.map((url) => c.add(url))))
+      .then(() => self.skipWaiting())
   );
 });
 
 // ── ACTIVATE ──
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((nama) =>
-      Promise.all(nama.filter((n) => n !== CACHE).map((n) => caches.delete(n)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((nama) => Promise.all(
+        nama.filter((n) => n !== CACHE).map((n) => caches.delete(n))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -36,7 +42,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // 1) JANGAN sentuh data & API — selalu ke jaringan asli.
+  // 1) DATA & API — jangan sentuh, selalu ke jaringan asli.
   if (
     e.request.method !== 'GET' ||
     url.pathname.startsWith('/api/') ||
@@ -46,10 +52,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 2) ASET STATIS BER-HASH (/_next/, gambar, ikon) → CACHE-FIRST.
-  //    Nama ber-hash = immutable; aman dari cache selamanya, tak akan basi.
-  //    Ini yang MENYELESAIKAN cold-start blank: JS Next selalu ada di cache,
-  //    diambil duluan dari cache, tak bergantung jaringan.
+  // 2) ASET STATIS BER-HASH — cache-first + .catch (anti-freeze)
   const asetStatis =
     url.pathname.startsWith('/_next/') ||
     /\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico)$/i.test(url.pathname);
@@ -57,20 +60,22 @@ self.addEventListener('fetch', (e) => {
   if (asetStatis) {
     e.respondWith(
       caches.match(e.request).then((cached) => {
-        if (cached) return cached;               // ada di cache → pakai
-        return fetch(e.request).then((res) => {  // belum → ambil & simpan
-          const salinan = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, salinan));
-          return res;
-        });
+        if (cached) return cached;
+        return fetch(e.request)
+          .then((res) => {
+            const salinan = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, salinan));
+            return res;
+          })
+          .catch(() =>
+            new Response('', { status: 504, statusText: 'Offline' })
+          );
       })
     );
     return;
   }
 
-  // 3) HALAMAN / NAVIGASI → NETWORK-FIRST.
-  //    Selalu coba versi terbaru (app sering di-deploy); offline → cache;
-  //    kalau navigasi & tak ada di cache → fallback ke '/' (app shell).
+  // 3) HALAMAN / NAVIGASI — network-first
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -79,9 +84,7 @@ self.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() =>
-        caches.match(e.request).then((cached) =>
-          cached || caches.match('/')
-        )
+        caches.match(e.request).then((cached) => cached || caches.match('/'))
       )
   );
 });
