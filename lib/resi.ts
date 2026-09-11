@@ -10,6 +10,10 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let pendengar: (() => void) | null = null;
 let sedangKirim = false;
 
+/** Apakah ada resi sedang dijadwalkan (timer aktif)? Sinyal lokal, nol query. */
+export function adaResiDijadwalkan(): boolean {
+  return timer !== null;
+}
 /** Daftar warga_id yang resinya masih tertahan (untuk indikator). */
 export async function petiTertahan(): Promise<string[]> {
   const { data } = await supabase.from('transaksi')
