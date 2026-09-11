@@ -7,7 +7,6 @@ import { rupiah } from '@/lib/uang';
 import { prosesOutbox } from '@/lib/outbox';
 import SheetPindah from '@/components/sheet-pindah';
 import SyncBadge from '@/components/sync-badge';
-import PetiResi from '@/components/peti-resi';
 import { kirimSemuaTertahan } from '@/lib/resi';
 import FonnteBadge from '@/components/fonnte-badge';
 
@@ -85,7 +84,6 @@ useEffect(() => {
       </div>
 
       <SyncBadge />
-      <PetiResi />
       <FonnteBadge />
 
       <div className="text-[10px] font-extrabold tracking-widest uppercase mt-4 mb-2"

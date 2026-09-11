@@ -1,16 +1,27 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { petiTertahan, batalkanPeti, kirimSemuaTertahan } from '@/lib/resi';
+import { jumlahAntrian } from '@/lib/outbox';
 
 export default function PetiResi() {
   const [tertahan, setTertahan] = useState<string[]>([]);
   const [detik, setDetik] = useState(60);
 
-  async function refresh() { setTertahan(await petiTertahan()); }
+  async function refresh() {
+    // GERBANG LOKAL: cek outbox lokal (Dexie/IndexedDB — gratis, TAK sentuh Supabase).
+    // 99% waktu outbox kosong → berhenti di sini tanpa query database.
+    // Query Supabase HANYA saat benar-benar ada aktivitas resi.
+    const antri = await jumlahAntrian();
+    if (antri === 0) {
+      if (tertahan.length !== 0) setTertahan([]);
+      return;
+    }
+    setTertahan(await petiTertahan());
+  }
 
   useEffect(() => {
     refresh();
-    const iv = setInterval(refresh, 2000);
+    const iv = setInterval(refresh, 10000);   // 2 detik → 10 detik
     return () => clearInterval(iv);
   }, []);
 
