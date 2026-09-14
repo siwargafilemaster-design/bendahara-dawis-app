@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { angka, ambilPengaturan } from './pengaturan';
-import { Periode } from './periode';
+import { Periode, geser } from './periode';
 
 export type BarisKeluar = { kategori: string; nominal: number; catatan: string | null; tanggal: string };
 export type BarisMasuk = { noRumah: string; namaKK: string; nominal: number; periode: string; tanggal: string };
@@ -22,15 +22,17 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
   const peng = await ambilPengaturan();
   const saldoAwal = angka(peng, 'saldo_awal', 0);
 
-  const [th, bl] = periode.split('-');
-  const awalBln = `${th}-${bl}-01`;
-  const akhirBln = `${th}-${bl}-31`;
+  const awalBln = `${periode}-01`;
+  // hari pertama bulan BERIKUTNYA — hindari hardcode -31 (September/April/dst
+  // tak punya tanggal 31; Februari lebih pendek lagi). Pakai batas "< tgl 1
+  // bulan depan" supaya benar untuk SEMUA bulan tanpa tahu panjangnya.
+  const awalBlnBerikut = `${geser(periode, 1)}-01`;
 
   // iuran masuk berdasarkan TANGGAL BAYAR (basis kas), bukan periode iuran
   const { data: masukData } = await supabase.from('transaksi')
     .select('nominal, periode, tanggal, warga:warga_id(no_rumah,nama_kk)')
     .eq('jenis', 'masuk').eq('dibatalkan', false)
-    .gte('tanggal', awalBln).lte('tanggal', akhirBln);
+    .gte('tanggal', awalBln).lt('tanggal', awalBlnBerikut);
 
   const masuk: BarisMasuk[] = (masukData ?? []).map((r: any) => ({
     noRumah: r.warga?.no_rumah ?? '—', namaKK: r.warga?.nama_kk ?? '—',
@@ -41,7 +43,7 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
   const { data: keluarData } = await supabase.from('transaksi')
     .select('nominal, catatan, tanggal, kategori:kategori_id(nama)')
     .eq('jenis', 'keluar').eq('dibatalkan', false)
-    .gte('tanggal', awalBln).lte('tanggal', akhirBln);
+    .gte('tanggal', awalBln).lt('tanggal', awalBlnBerikut);
 
   const keluar: BarisKeluar[] = (keluarData ?? []).map((r: any) => ({
     kategori: r.kategori?.nama ?? 'Lain', nominal: r.nominal,
@@ -56,7 +58,7 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
   const { data: semua } = await supabase.from('transaksi')
     .select('jenis, nominal, tanggal')
     .eq('dibatalkan', false)
-    .lte('tanggal', akhirBln);
+    .lt('tanggal', awalBlnBerikut);
 
   let saldo = saldoAwal;
   for (const t of semua ?? []) {
