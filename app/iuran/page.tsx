@@ -2,8 +2,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ambilPengaturan, angka } from '@/lib/pengaturan';
-import { periodeSekarang, namaBulan, geser } from '@/lib/periode';
-import { baueIuran, simpanTransaksi, batalkan, Kantong } from '@/lib/transaksi';
+import { periodeSekarang, namaBulan, geser, Periode } from '@/lib/periode';
+import { baueIuran, simpanTransaksi, batalkan, periodeBelumDibayar, Kantong } from '@/lib/transaksi';
 import { db } from '@/lib/db';
 import { prosesOutbox } from '@/lib/outbox';
 import { denganTimeout } from '@/lib/net';
@@ -24,6 +24,7 @@ export default function Iuran() {
   const [iuran, setIuran] = useState(10000);
   const [toast, setToast] = useState('');
   const [sheet, setSheet] = useState<Warga | null>(null);
+  const [periodeBelum, setPeriodeBelum] = useState<Periode[]>([]);
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLong = useRef(false);
@@ -133,25 +134,36 @@ export default function Iuran() {
   async function simpanBatch(w: Warga, kantong: Kantong, jumlahBulan: number) {
     setSheet(null);
     const batch = jumlahBulan > 1 ? crypto.randomUUID() : null;
-    const rows = Array.from({ length: jumlahBulan }, (_, i) => {
-      const r = baueIuran(w.id, geser(periode, i), iuran, kantong, batch);
-      r.resi_status = 'tertahan';                      // ← semua tertahan
+
+    // isi N periode pertama yang BELUM dibayar (tunggakan lama dulu) —
+    // bukan geser(periode, i) dari bulan grid, itu bug lama Bu Bella
+    const periodeIsi = periodeBelum.slice(0, jumlahBulan);
+
+    const rows = periodeIsi.map(p => {
+      const r = baueIuran(w.id, p, iuran, kantong, batch);
+      r.resi_status = 'tertahan';
       return r;
     });
-    // ... (setBayar, pesan, simpanTransaksi sama)
-    await simpanTransaksi(rows);
-    jadwalkanKirim();
+
     const next = new Map(bayar);
     rows.forEach(r => { if (r.periode === periode) next.set(w.id, r.id); });
     setBayar(next);
     pesan(`${w.no_rumah} · ${w.nama_kk} — ${jumlahBulan} bulan`);
-    await simpanTransaksi(rows);
+
+    await simpanTransaksi(rows);   // ← SEKALI saja (versi lama panggil 2x)
+    jadwalkanKirim();
   }
 
   const lpProps = (w: Warga) => ({
     onPointerDown: () => {
       isLong.current = false;
-      pressTimer.current = setTimeout(() => { isLong.current = true; setSheet(w); }, 450);
+      pressTimer.current = setTimeout(async () => {
+        isLong.current = true;
+        // hitung periode belum-dibayar SEBELUM buka sheet — tunggakan lama dulu
+        const belum = await periodeBelumDibayar(w.id, w.periode_awal, 12);
+        setPeriodeBelum(belum);
+        setSheet(w);
+      }, 450);
     },
     onPointerUp: () => { if (pressTimer.current) clearTimeout(pressTimer.current); },
     onPointerLeave: () => { if (pressTimer.current) clearTimeout(pressTimer.current); },
@@ -216,7 +228,7 @@ export default function Iuran() {
       {sheet && (
         <SheetIuran
           nama={sheet.nama_kk} noRumah={sheet.no_rumah}
-          periodeAwal={periode} iuran={iuran}
+          periodeBelum={periodeBelum} iuran={iuran}
           onTutup={() => setSheet(null)}
           onSimpan={(k, n) => simpanBatch(sheet, k, n)}
         />

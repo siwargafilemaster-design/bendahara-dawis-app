@@ -20,31 +20,43 @@ async function kirimWA(nomor: string, teks: string) {
     body: new URLSearchParams({ target: nomor, message: teks }),
   });
   const data = await res.json();
-  // Fonnte balas { status: true/false, ... }
-  if (!data.status) throw new Error(data.reason || 'Fonnte gagal');
+  // Fonnte balas { status: true/false, reason?: string, ... }
+  if (!data.status) throw new Error(data.reason || 'Fonnte menolak tanpa alasan');
   return data;
 }
 
 export async function POST(req: NextRequest) {
+  const { transaksiIds, nomor, teks } = await req.json().catch(() => ({}));
+
+  if (!nomor || !teks || !Array.isArray(transaksiIds)) {
+    return NextResponse.json({ ok: false, error: 'Data kurang' }, { status: 400 });
+  }
+
   try {
-    const { transaksiIds, nomor, teks } = await req.json();
-
-    if (!nomor || !teks || !Array.isArray(transaksiIds)) {
-      return NextResponse.json({ ok: false, error: 'Data kurang' }, { status: 400 });
-    }
-
     // 1) kirim WA
     await kirimWA(nomor, teks);
 
     // 2) tandai transaksi sebagai terkirim (server, bypass RLS)
     const { error } = await admin.from('transaksi')
-      .update({ resi_status: 'terkirim', resi_dikirim_pada: new Date().toISOString() })
+      .update({ resi_status: 'terkirim', resi_dikirim_pada: new Date().toISOString(), resi_error: null })
       .in('id', transaksiIds);
 
     if (error) throw error;
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    // ★ DIAGNOSTIK: simpan pesan error ASLI ke baris transaksi.
+    // Sekarang kegagalan bisa dibaca langsung di Supabase table editor,
+    // tak perlu buka log Vercel lagi.
+    const pesanError = e?.message || String(e);
+    try {
+      await admin.from('transaksi')
+        .update({ resi_error: pesanError })
+        .in('id', transaksiIds);
+    } catch {
+      // kalau update diagnostik ini sendiri gagal, jangan sampai menutupi error asli
+    }
+
+    return NextResponse.json({ ok: false, error: pesanError }, { status: 500 });
   }
 }

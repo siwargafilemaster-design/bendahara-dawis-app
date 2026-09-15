@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Periode } from './periode';
+import { Periode, geser } from './periode';
 import { antreInsert, antreBatal, prosesOutbox } from './outbox';
 
 export type Jenis = 'masuk' | 'keluar' | 'pindah';
@@ -18,40 +18,31 @@ export type Transaksi = {
   catatan: string | null;
   foto_url: string | null;
   batch_id: string | null;
-  resi_status: 'tertahan' | 'terkirim' | 'diralat' | 'gagal' | 'skip';
-  dibatalkan: boolean;
-  created_at?: string;
-};
-
-const uuid = () => crypto.randomUUID();
-const hariIni = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  dibatalkan?: boolean;
+  resi_status?: string;
 };
 
 export function baueIuran(warga_id: string, periode: Periode, nominal: number,
   kantong: Kantong, batch_id: string | null = null): Transaksi {
   return {
-    id: uuid(), tanggal: hariIni(), jenis: 'masuk', kantong,
+    id: crypto.randomUUID(),
+    tanggal: new Date().toISOString().slice(0, 10),
+    jenis: 'masuk', kantong,
     kantong_tujuan: null, kategori_id: null, warga_id, periode,
     nominal, catatan: null, foto_url: null, batch_id,
-    resi_status: 'skip', dibatalkan: false,
   };
 }
 
-/** Tulis via OUTBOX (tahan mati), lalu picu pengiriman. */
 export async function simpanTransaksi(rows: Transaksi[]) {
   for (const r of rows) await antreInsert(r);
-  prosesOutbox();               // tidak di-await: jangan tahan UI
+  await prosesOutbox();
 }
 
-/** Batalkan via OUTBOX. */
 export async function batalkan(id: string) {
   await antreBatal(id);
-  prosesOutbox();
+  await prosesOutbox();
 }
 
-/** BACA — tetap dari Supabase (dilengkapi overlay di page). */
 export async function statusBayar(periode: Periode): Promise<Set<string>> {
   const { data, error } = await supabase.from('transaksi')
     .select('warga_id')
@@ -66,4 +57,28 @@ export async function semuaIuran(): Promise<{ warga_id: string; periode: Periode
     .eq('jenis', 'masuk').eq('dibatalkan', false);
   if (error) throw error;
   return (data ?? []) as any;
+}
+
+/** Daftar periode yang BELUM dibayar warga ini, urut dari paling lama.
+ *  Mulai dari periode_awal warga; lewati yang sudah dibayar; kumpulkan
+ *  sampai `jumlah` periode. Kalau tunggakan habis, lanjut ke bulan depan
+ *  (mendukung bayar di muka). PRIORITAS: tutup tunggakan lama dulu —
+ *  bukan "bulan aktif di grid + ke depan" seperti versi lama. */
+export async function periodeBelumDibayar(
+  wargaId: string,
+  periodeAwal: Periode,
+  jumlah: number,
+): Promise<Periode[]> {
+  const semua = await semuaIuran();
+  const sudah = new Set(
+    semua.filter(r => r.warga_id === wargaId).map(r => r.periode)
+  );
+
+  const hasil: Periode[] = [];
+  let p = periodeAwal;
+  for (let i = 0; i < 240 && hasil.length < jumlah; i++) {
+    if (!sudah.has(p)) hasil.push(p);
+    p = geser(p, 1);
+  }
+  return hasil;
 }

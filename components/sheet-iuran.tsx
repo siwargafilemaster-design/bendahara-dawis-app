@@ -1,24 +1,31 @@
 'use client';
 import { useState } from 'react';
-import { geser, namaBulan, Periode } from '@/lib/periode';
+import { namaBulan, Periode } from '@/lib/periode';
 import { rupiah } from '@/lib/uang';
 import { Kantong } from '@/lib/transaksi';
 
 type Props = {
   nama: string;
   noRumah: string;
-  periodeAwal: Periode;
+  periodeBelum: Periode[];   // periode belum-dibayar, urut lama→baru (dihitung di parent)
   iuran: number;
   onTutup: () => void;
   onSimpan: (kantong: Kantong, jumlahBulan: number) => void;
 };
 
-export default function SheetIuran({ nama, noRumah, periodeAwal, iuran, onTutup, onSimpan }: Props) {
+export default function SheetIuran({ nama, noRumah, periodeBelum, iuran, onTutup, onSimpan }: Props) {
   const [kantong, setKantong] = useState<Kantong>('tunai');
   const [bulan, setBulan] = useState(1);
 
-  const daftar = Array.from({ length: bulan }, (_, i) => geser(periodeAwal, i));
+  const maks = Math.max(1, periodeBelum.length);
+  const dibayar = periodeBelum.slice(0, bulan);   // N periode pertama yang belum dibayar
   const total = bulan * iuran;
+
+  const labelPeriode = dibayar.length === 0
+    ? '—'
+    : dibayar.length === 1
+      ? namaBulan(dibayar[0])
+      : `${namaBulan(dibayar[0])} – ${namaBulan(dibayar[dibayar.length - 1])}`;
 
   return (
     <>
@@ -28,7 +35,7 @@ export default function SheetIuran({ nama, noRumah, periodeAwal, iuran, onTutup,
         <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'var(--line)' }} />
         <h3 className="text-base font-extrabold">{noRumah} · {nama}</h3>
         <p className="text-[11.5px] mb-4" style={{ color: 'var(--muted)' }}>
-          Iuran {namaBulan(periodeAwal)}
+          Iuran {periodeBelum[0] ? namaBulan(periodeBelum[0]) : '—'}
         </p>
 
         <label className="block text-[10px] font-extrabold tracking-widest uppercase mb-1.5"
@@ -58,16 +65,14 @@ export default function SheetIuran({ nama, noRumah, periodeAwal, iuran, onTutup,
             <div className="text-[10px] font-bold uppercase tracking-widest"
               style={{ color: 'var(--muted)' }}>bulan</div>
           </div>
-          <button onClick={() => setBulan(b => b + 1)}
-            className="w-12 h-12 rounded-xl border text-2xl font-bold flex-none"
-            style={{ borderColor: 'var(--line)' }}>+</button>
+          <button onClick={() => setBulan(b => Math.min(maks, b + 1))}
+            className="w-12 h-12 rounded-xl border text-2xl font-bold flex-none disabled:opacity-30"
+            style={{ borderColor: 'var(--line)' }} disabled={bulan >= maks}>+</button>
         </div>
 
-        {bulan > 1 && (
-          <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
-            {namaBulan(daftar[0])} – {namaBulan(daftar[bulan - 1])}
-          </p>
-        )}
+        <p className="text-[12px] mb-3 font-bold" style={{ color: 'var(--brand)' }}>
+          Bayar {bulan} bulan · {labelPeriode}
+        </p>
 
         <button onClick={() => onSimpan(kantong, bulan)}
           className="w-full py-3 rounded-xl text-white font-bold"
