@@ -3,7 +3,7 @@
 //  Network-first halaman + cache-first aset (dengan .catch anti-freeze)
 // ══════════════════════════════════════════════
 
-const CACHE = 'dawis-v6';
+const CACHE = 'dawis-v7';
 
 const SHELL = [
   '/',
