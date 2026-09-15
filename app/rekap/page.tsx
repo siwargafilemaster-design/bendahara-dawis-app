@@ -135,6 +135,12 @@ export default function RekapPage() {
             style={{ borderColor: 'var(--line)', color: 'var(--brand)' }}>
             📇 Kartu Iuran per KK
           </Link>
+
+          <Link href="/rekap/laporan-tahunan"
+            className="w-full py-3 rounded-xl border font-bold text-[13px] mt-2 flex items-center justify-center gap-2"
+            style={{ borderColor: 'var(--line)', color: 'var(--brand)' }}>
+            📊 Laporan Tahunan Semua Anggota
+          </Link>
         </>
       )}
     </div>
