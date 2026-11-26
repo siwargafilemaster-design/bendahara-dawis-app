@@ -111,8 +111,13 @@ export async function unduhPDF(rekap: Rekap) {
 
 const NAMA_BL_PENDEK = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 
+// Font bawaan jsPDF (helvetica) hanya kenal huruf Latin dasar — '✓' tidak
+// ada di dalamnya, jadi tercetak jadi ' . Centang diambil dari font bawaan
+// ZapfDingbats: huruf '4' di font itu = ✔.
+const CENTANG = '4';
+
 function simbolStatus(s: string): string {
-  if (s === 'lunas') return '✓';
+  if (s === 'lunas') return CENTANG;
   if (s === 'nunggak') return 'X';
   if (s === 'belum') return '';
   return '–';
@@ -148,9 +153,17 @@ export async function unduhLaporanTahunan(tahun: number) {
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
   doc.text(`Tahun ${tahun}`, W / 2, 32, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  doc.text('✓ Lunas    X Nunggak    (kosong) Belum jatuh tempo    – Di luar masa keanggotaan',
-    W / 2, 37, { align: 'center' });
+  // keterangan: centang (ZapfDingbats) + teks (helvetica), dirangkai di tengah
+  doc.setFontSize(7.5);
+  const ket = '  Lunas      X Nunggak      (kosong) Belum jatuh tempo      – Di luar masa keanggotaan';
+  doc.setFont('zapfdingbats', 'normal');
+  const lebarCentang = doc.getTextWidth(CENTANG);
+  doc.setFont('helvetica', 'normal');
+  const xKet = W / 2 - (lebarCentang + doc.getTextWidth(ket)) / 2;
+  doc.setFont('zapfdingbats', 'normal');
+  doc.text(CENTANG, xKet, 37);
+  doc.setFont('helvetica', 'normal');
+  doc.text(ket, xKet + lebarCentang, 37);
 
   doc.setDrawColor(180); doc.line(10, 40, W - 10, 40);
 
@@ -179,6 +192,7 @@ export async function unduhLaporanTahunan(tahun: number) {
         const status = baris[d.row.index]?.sel[d.column.index - 2]?.status;
         const warna = warnaStatus(status);
         if (warna) d.cell.styles.fillColor = warna;
+        if (status === 'lunas') d.cell.styles.font = 'zapfdingbats';
       }
     },
   });

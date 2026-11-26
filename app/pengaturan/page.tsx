@@ -130,7 +130,7 @@ export default function Pengaturan() {
             🏷
           </span>
           <span className="flex-1 font-bold text-[13px]">
-            Kategori pengeluaran
+            Kategori pengeluaran / pemasukan
           </span>
           <span style={{ color: "var(--line)" }}>›</span>
         </Link>
