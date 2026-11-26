@@ -6,8 +6,13 @@ import { Kantong } from '@/lib/transaksi';
 
 type Kategori = { id: string; nama: string };
 
-export default function SheetKas({ onTutup, onSelesai }:
-  { onTutup: () => void; onSelesai: () => void }) {
+/** Satu sheet untuk dua arah:
+ *  - jenis 'keluar' → pengeluaran (seperti sebelumnya)
+ *  - jenis 'masuk'  → pemasukan lain (bank sampah, hibah, …)
+ *  Pemasukan lain = jenis 'masuk' TANPA warga & periode. Itu pembedanya
+ *  dari iuran — jadi tidak pernah masuk ke Kartu Iuran / tunggakan / resi. */
+export default function SheetKas({ jenis = 'keluar', onTutup, onSelesai }:
+  { jenis?: 'keluar' | 'masuk'; onTutup: () => void; onSelesai: () => void }) {
 
   const [kategori, setKategori] = useState<Kategori[]>([]);
   const [katId, setKatId] = useState('');
@@ -18,9 +23,11 @@ export default function SheetKas({ onTutup, onSelesai }:
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    supabase.from('kategori').select('id,nama').eq('aktif', true).order('urutan')
+    // hanya kategori untuk arah ini — "Konsumsi" tak muncul di pemasukan, dst.
+    supabase.from('kategori').select('id,nama')
+      .eq('aktif', true).eq('untuk', jenis).order('urutan')
       .then(({ data }) => { setKategori(data ?? []); if (data?.[0]) setKatId(data[0].id); });
-  }, []);
+  }, [jenis]);
 
   async function kirim() {
     const n = parseRupiah(nominal);
@@ -32,7 +39,7 @@ export default function SheetKas({ onTutup, onSelesai }:
     const tgl = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const { error } = await supabase.from('transaksi').insert({
-      id: crypto.randomUUID(), tanggal: tgl, jenis: 'keluar',
+      id: crypto.randomUUID(), tanggal: tgl, jenis,
       kantong, kantong_tujuan: null, kategori_id: katId,
       warga_id: null, periode: null, nominal: n,
       catatan: catatan.trim() || null, resi_status: 'skip', dibatalkan: false,
@@ -52,7 +59,9 @@ export default function SheetKas({ onTutup, onSelesai }:
       <div className="fixed left-0 right-0 bottom-0 z-40 rounded-t-3xl p-4 safe-b"
         style={{ background: 'var(--paper)' }}>
         <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'var(--line)' }} />
-        <h3 className="text-base font-extrabold mb-3">Catat pengeluaran</h3>
+        <h3 className="text-base font-extrabold mb-3">
+          {jenis === 'masuk' ? 'Catat pemasukan' : 'Catat pengeluaran'}
+        </h3>
 
         <input className={F + ' mb-2.5'} style={S} inputMode="numeric"
           placeholder="Nominal" value={formatKetik(nominal)}
@@ -75,7 +84,8 @@ export default function SheetKas({ onTutup, onSelesai }:
           {kategori.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
         </select>
 
-        <input className={F + ' mb-3'} style={S} placeholder="Catatan (opsional)"
+        <input className={F + ' mb-3'} style={S}
+          placeholder={jenis === 'masuk' ? 'Catatan, mis. Jual sampah 12 Des' : 'Catatan (opsional)'}
           value={catatan} onChange={e => setCatatan(e.target.value)} />
 
         {err && <p className="text-[12px] mb-2" style={{ color: 'var(--brick)' }}>{err}</p>}

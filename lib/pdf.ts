@@ -36,6 +36,13 @@ export async function unduhPDF(rekap: Rekap) {
   let y = 49;
   doc.text(`Saldo Awal Bulan : ${rupiah(saldoAwal)}`, 15, y); y += 6;
   doc.text(`Total Pemasukan  : ${rupiah(rekap.totalMasuk)}`, 15, y); y += 6;
+  // rincian hanya kalau ada pemasukan lain — bulan biasa tampil seperti dulu
+  if (rekap.lain.length > 0) {
+    doc.setFontSize(9);
+    doc.text(`   - Iuran          : ${rupiah(rekap.totalIuran)}`, 15, y); y += 5;
+    doc.text(`   - Pemasukan lain : ${rupiah(rekap.totalLain)}`, 15, y); y += 6;
+    doc.setFontSize(10);
+  }
   doc.text(`Total Pengeluaran: ${rupiah(rekap.totalKeluar)}`, 15, y); y += 6;
   doc.setFont('helvetica', 'bold');
   doc.text(`Saldo Akhir      : ${rupiah(rekap.saldoAkhir)}`, 15, y); y += 4;
@@ -55,6 +62,24 @@ export async function unduhPDF(rekap: Rekap) {
     bodyStyles: { fontSize: 8 },
     margin: { left: 15, right: 15 },
   });
+
+  // pemasukan lain — tabel sendiri, hanya kalau bulan ini ada isinya
+  if (rekap.lain.length > 0) {
+    const yLain = (doc as any).lastAutoTable.finalY + 8;
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.text('Rincian Pemasukan Lain', 15, yLain - 2);
+    autoTable(doc, {
+      startY: yLain,
+      head: [['Tanggal', 'Kategori', 'Keterangan', 'Jumlah']],
+      body: rekap.lain.map(l => [l.tanggal, l.kategori, l.catatan ?? '-', rupiah(l.nominal)]),
+      foot: [['', '', 'Subtotal', rupiah(rekap.totalLain)]],
+      theme: 'grid',
+      headStyles: { fillColor: [31, 81, 56], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      footStyles: { fillColor: [244, 248, 245], textColor: [18, 36, 27], fontSize: 8.5 },
+      margin: { left: 15, right: 15 },
+    });
+  }
 
   const yKeluar = (doc as any).lastAutoTable.finalY + 8;
   doc.setFontSize(9); doc.setFont('helvetica', 'bold');

@@ -14,6 +14,7 @@ type Trx = {
   id: string; jenis: string; nominal: number; kantong: string;
   periode: string | null; catatan: string | null; tanggal: string;
   warga: { no_rumah: string; nama_kk: string } | null;
+  kategori: { nama: string } | null;
 };
 
 export default function Beranda() {
@@ -28,7 +29,7 @@ export default function Beranda() {
       const p = await ambilPengaturan();
       setSaldo(await hitungSaldo(p));
       const { data } = await supabase.from('transaksi')
-        .select('id,jenis,nominal,kantong,periode,catatan,tanggal, warga:warga_id(no_rumah,nama_kk)')
+        .select('id,jenis,nominal,kantong,periode,catatan,tanggal, warga:warga_id(no_rumah,nama_kk), kategori:kategori_id(nama)')
         .eq('dibatalkan', false)
         .order('created_at', { ascending: false }).limit(5);
       setTrx((data ?? []) as any);
@@ -97,6 +98,7 @@ useEffect(() => {
             <div className="flex-1 min-w-0">
               <b className="block text-[12.5px] truncate">
                 {t.warga ? `${t.warga.no_rumah} · ${t.warga.nama_kk}`
+                  : t.jenis === 'masuk' ? (t.kategori?.nama ?? 'Pemasukan lain')
                   : (t.catatan ?? (t.jenis === 'pindah' ? 'Pindah kantong' : 'Pengeluaran'))}
               </b>
               <span className="text-[10.5px]" style={{ color: 'var(--muted)' }}>

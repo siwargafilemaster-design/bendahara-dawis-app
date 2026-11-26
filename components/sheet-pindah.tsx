@@ -17,7 +17,7 @@ export default function SheetPindah({ onTutup, onSelesai }:
   const ke: Kantong = dari === 'tunai' ? 'dana' : 'tunai';
 
   useEffect(() => {
-    supabase.from('kategori').select('id').eq('nama', 'Biaya admin').single()
+    supabase.from('kategori').select('id').eq('nama', 'Biaya admin').eq('untuk', 'keluar').single()
       .then(({ data }) => data && setIdAdmin(data.id));
   }, []);
 

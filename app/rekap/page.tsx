@@ -101,7 +101,45 @@ export default function RekapPage() {
                 <span className="num" style={{ color: 'var(--paid)' }}>+{m.nominal.toLocaleString('id-ID')}</span>
               </div>
             ))}
+            {rekap.lain.length > 0 && rekap.masuk.length > 0 && (
+              <div className="flex justify-between p-2.5 text-[12px] font-extrabold rounded-b-2xl"
+                style={{ background: '#F4F8F5' }}>
+                <span>Subtotal iuran</span>
+                <span className="num">{rupiah(rekap.totalIuran)}</span>
+              </div>
+            )}
           </div>
+
+          {/* pemasukan lain — hanya tampil kalau bulan ini ada isinya */}
+          {rekap.lain.length > 0 && (
+            <>
+              <div className="text-[10px] font-extrabold tracking-widest uppercase mb-2"
+                style={{ color: 'var(--muted)' }}>Pemasukan lain</div>
+              <div className="rounded-2xl bg-white border mb-2" style={{ borderColor: 'var(--line)' }}>
+                {rekap.lain.map((l, i) => (
+                  <div key={i} className="flex justify-between items-center gap-2 p-2.5 border-b text-[12px]"
+                    style={{ borderColor: 'var(--line)' }}>
+                    <span className="min-w-0">
+                      <b>{l.kategori}</b>
+                      <span style={{ color: 'var(--muted)' }}> · {l.tanggal.slice(8, 10)}/{l.tanggal.slice(5, 7)}</span>
+                      {l.catatan && <span className="block text-[10.5px]" style={{ color: 'var(--muted)' }}>{l.catatan}</span>}
+                    </span>
+                    <span className="num flex-none" style={{ color: 'var(--paid)' }}>+{l.nominal.toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between p-2.5 text-[12px] font-extrabold rounded-b-2xl"
+                  style={{ background: '#F4F8F5' }}>
+                  <span>Subtotal pemasukan lain</span>
+                  <span className="num">{rupiah(rekap.totalLain)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between px-3 py-2.5 rounded-xl text-white text-[12.5px] font-extrabold mb-3"
+                style={{ background: 'var(--brand)' }}>
+                <span>Total Masuk</span>
+                <span className="num">{rupiah(rekap.totalMasuk)}</span>
+              </div>
+            </>
+          )}
 
           {/* pengeluaran */}
           <div className="text-[10px] font-extrabold tracking-widest uppercase mb-2"

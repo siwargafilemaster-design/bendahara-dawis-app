@@ -4,20 +4,26 @@ import { Periode, geser } from './periode';
 
 export type BarisKeluar = { kategori: string; nominal: number; catatan: string | null; tanggal: string };
 export type BarisMasuk = { noRumah: string; namaKK: string; nominal: number; periode: string; tanggal: string };
+export type BarisLain = { kategori: string; nominal: number; catatan: string | null; tanggal: string };
 
 export type Rekap = {
   periode: Periode;
-  totalMasuk: number;
+  totalMasuk: number;      // iuran + pemasukan lain (dipakai saldo & PDF)
+  totalIuran: number;
+  totalLain: number;
   totalKeluar: number;
   saldoAkhir: number;      // saldo kumulatif s/d akhir bulan ini (basis kas)
-  masuk: BarisMasuk[];
+  masuk: BarisMasuk[];     // iuran saja
+  lain: BarisLain[];       // pemasukan lain (bank sampah, hibah, …)
   keluar: BarisKeluar[];
   jumlahBayar: number;     // brp baris iuran masuk bulan ini
 };
 
 /** Rekap satu bulan — BASIS KAS: yang dilaporkan = uang yang MASUK/KELUAR
  *  di bulan itu (per tanggal transaksi), bukan per bulan iuran.
- *  Uang di tangan bendahara selalu cocok dengan laporan. */
+ *  Uang di tangan bendahara selalu cocok dengan laporan.
+ *
+ *  Pemasukan lain = jenis 'masuk' TANPA warga. Iuran selalu punya warga. */
 export async function hitungRekap(periode: Periode): Promise<Rekap> {
   const peng = await ambilPengaturan();
   const saldoAwal = angka(peng, 'saldo_awal', 0);
@@ -32,11 +38,25 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
   const { data: masukData } = await supabase.from('transaksi')
     .select('nominal, periode, tanggal, warga:warga_id(no_rumah,nama_kk)')
     .eq('jenis', 'masuk').eq('dibatalkan', false)
+    .not('warga_id', 'is', null)
     .gte('tanggal', awalBln).lt('tanggal', awalBlnBerikut);
 
   const masuk: BarisMasuk[] = (masukData ?? []).map((r: any) => ({
     noRumah: r.warga?.no_rumah ?? '—', namaKK: r.warga?.nama_kk ?? '—',
     nominal: r.nominal, periode: r.periode, tanggal: r.tanggal,
+  }));
+
+  // pemasukan lain per tanggal
+  const { data: lainData } = await supabase.from('transaksi')
+    .select('nominal, catatan, tanggal, kategori:kategori_id(nama)')
+    .eq('jenis', 'masuk').eq('dibatalkan', false)
+    .is('warga_id', null)
+    .gte('tanggal', awalBln).lt('tanggal', awalBlnBerikut)
+    .order('tanggal');
+
+  const lain: BarisLain[] = (lainData ?? []).map((r: any) => ({
+    kategori: r.kategori?.nama ?? 'Lain', nominal: r.nominal,
+    catatan: r.catatan, tanggal: r.tanggal,
   }));
 
   // pengeluaran per tanggal
@@ -50,11 +70,14 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
     catatan: r.catatan, tanggal: r.tanggal,
   }));
 
-  const totalMasuk = masuk.reduce((s, r) => s + r.nominal, 0);
+  const totalIuran = masuk.reduce((s, r) => s + r.nominal, 0);
+  const totalLain = lain.reduce((s, r) => s + r.nominal, 0);
+  const totalMasuk = totalIuran + totalLain;
   const totalKeluar = keluar.reduce((s, r) => s + r.nominal, 0);
 
   // saldo akhir = saldo awal + semua masuk & keluar s/d akhir bulan ini
-  // (basis kas: murni per tanggal, konsisten masuk & keluar)
+  // (basis kas: murni per tanggal, konsisten masuk & keluar).
+  // 'masuk' di sini sudah termasuk pemasukan lain — sengaja tanpa filter warga.
   const { data: semua } = await supabase.from('transaksi')
     .select('jenis, nominal, tanggal')
     .eq('dibatalkan', false)
@@ -68,7 +91,7 @@ export async function hitungRekap(periode: Periode): Promise<Rekap> {
   }
 
   return {
-    periode, totalMasuk, totalKeluar, saldoAkhir: saldo,
-    masuk, keluar, jumlahBayar: masuk.length,
+    periode, totalMasuk, totalIuran, totalLain, totalKeluar, saldoAkhir: saldo,
+    masuk, lain, keluar, jumlahBayar: masuk.length,
   };
 }
